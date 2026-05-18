@@ -148,6 +148,24 @@ async def _save_via_lovelace_api(hass: HomeAssistant, config: dict) -> tuple[boo
             },
         )
         lovelace.dashboards[_DASHBOARD_URL_PATH] = dash
+        # Register the panel so it appears in the sidebar immediately.
+        # This replicates what HA does at startup for each stored dashboard.
+        try:
+            from homeassistant.components.frontend import async_register_built_in_panel  # noqa: PLC0415
+            await async_register_built_in_panel(
+                hass,
+                "lovelace",
+                sidebar_title="Simulated Devices",
+                sidebar_icon="mdi:robot-outline",
+                frontend_url_path=_DASHBOARD_URL_PATH,
+                require_admin=False,
+                config={"mode": "storage"},
+                update=False,
+                show_in_sidebar=True,
+            )
+            _LOGGER.info("Registered Simulated Devices panel in sidebar")
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.warning("Could not register frontend panel: %s", exc)
 
     try:
         await dash.async_save(config)
