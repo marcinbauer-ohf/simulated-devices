@@ -151,10 +151,9 @@ async def _save_via_lovelace_api(hass: HomeAssistant, config: dict) -> tuple[boo
         # Register the panel so it appears in the sidebar immediately.
         # This replicates what HA does at startup for each stored dashboard.
         try:
+            import inspect  # noqa: PLC0415
             from homeassistant.components.frontend import async_register_built_in_panel  # noqa: PLC0415
-            await async_register_built_in_panel(
-                hass,
-                "lovelace",
+            kwargs = dict(
                 sidebar_title="Simulated Devices",
                 sidebar_icon="mdi:robot-outline",
                 frontend_url_path=_DASHBOARD_URL_PATH,
@@ -163,6 +162,10 @@ async def _save_via_lovelace_api(hass: HomeAssistant, config: dict) -> tuple[boo
                 update=False,
                 show_in_sidebar=True,
             )
+            if inspect.iscoroutinefunction(async_register_built_in_panel):
+                await async_register_built_in_panel(hass, "lovelace", **kwargs)
+            else:
+                async_register_built_in_panel(hass, "lovelace", **kwargs)
             _LOGGER.info("Registered Simulated Devices panel in sidebar")
         except Exception as exc:  # noqa: BLE001
             _LOGGER.warning("Could not register frontend panel: %s", exc)
@@ -198,38 +201,43 @@ async def _ensure_dashboard_registered(hass: HomeAssistant) -> None:
 
 async def async_generate_dashboard(hass: HomeAssistant) -> None:
     """Generate and persist the Simulated Devices Lovelace dashboard."""
-    coordinators: dict = hass.data.get(DOMAIN, {})
-    registry = er.async_get(hass)
-    config = _build_dashboard(coordinators, registry)
+    msg: str
+    try:
+        coordinators: dict = hass.data.get(DOMAIN, {})
+        registry = er.async_get(hass)
+        config = _build_dashboard(coordinators, registry)
 
-    # Always register in persistent storage so the dashboard survives a restart,
-    # regardless of whether the live API save succeeds.
-    await _ensure_dashboard_registered(hass)
+        # Always register in persistent storage so the dashboard survives a restart,
+        # regardless of whether the live API save succeeds.
+        await _ensure_dashboard_registered(hass)
 
-    saved_live, was_new = await _save_via_lovelace_api(hass, config)
+        saved_live, was_new = await _save_via_lovelace_api(hass, config)
 
-    if not saved_live:
-        store = Store(hass, 1, _DASHBOARD_STORE_KEY)
-        await store.async_save({"config": config})
+        if not saved_live:
+            store = Store(hass, 1, _DASHBOARD_STORE_KEY)
+            await store.async_save({"config": config})
 
-    device_count = len(coordinators)
-    if not saved_live:
-        msg = (
-            f"Dashboard saved with {device_count} device(s). "
-            "Restart Home Assistant to activate it, then navigate to "
-            "[/simulated-devices](/simulated-devices)."
-        )
-    elif was_new:
-        msg = (
-            f"Dashboard created with {device_count} device(s). "
-            "Refresh your browser or navigate to "
-            "[/simulated-devices](/simulated-devices)."
-        )
-    else:
-        msg = (
-            f"Dashboard regenerated with {device_count} device(s). "
-            "Your browser will refresh automatically."
-        )
+        device_count = len(coordinators)
+        if not saved_live:
+            msg = (
+                f"Dashboard saved with {device_count} device(s). "
+                "Restart Home Assistant to activate it, then navigate to "
+                "[/simulated-devices](/simulated-devices)."
+            )
+        elif was_new:
+            msg = (
+                f"Dashboard created with {device_count} device(s). "
+                "Refresh your browser or navigate to "
+                "[/simulated-devices](/simulated-devices)."
+            )
+        else:
+            msg = (
+                f"Dashboard regenerated with {device_count} device(s). "
+                "Your browser will refresh automatically."
+            )
+    except Exception as exc:  # noqa: BLE001
+        _LOGGER.error("Dashboard generation failed: %s", exc, exc_info=True)
+        msg = f"Dashboard generation failed: {exc}\n\nCheck Home Assistant logs for details."
 
     await hass.services.async_call(
         "persistent_notification",
