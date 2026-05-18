@@ -41,6 +41,10 @@ Simulate virtual smart home devices in Home Assistant for testing automations, d
 
 ### Via HACS (recommended)
 
+[![Open your Home Assistant instance and add a custom repository.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=marcinbauer-ohf&repository=simulated-devices&category=integration)
+
+Or manually:
+
 1. Open HACS → **Integrations**
 2. Click the three-dot menu (⋮) → **Custom repositories**
 3. Add your repo URL, category **Integration** → click **Add**
