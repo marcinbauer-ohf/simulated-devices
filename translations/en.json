@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "Add simulated device",
+        "title": "Simulated Devices",
         "menu_options": {
           "single": "Add single device",
           "batch": "Create all device types at once",
@@ -51,7 +51,7 @@
     "abort": {
       "already_configured": "A simulated device with this name and type already exists.",
       "no_discovery_data": "Missing discovery details. Please try discovery again.",
-      "batch_initiated": "All 24 device types are being created in the background. They will appear in your devices list shortly.",
+      "batch_initiated": "All 24 device types are being created in the background. They will appear in your devices list shortly. Once they appear, use Generate dashboard to build the Lovelace dashboard.",
       "dashboard_generated": "Dashboard generated. Navigate to Simulated Devices in the sidebar, or refresh your browser if it was already open.",
       "all_devices_removed": "All simulated devices have been removed."
     }

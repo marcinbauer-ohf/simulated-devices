@@ -112,28 +112,30 @@ def _build_dashboard(
     }
 
 
-async def _save_via_lovelace_api(hass: HomeAssistant, config: dict) -> bool:
-    """Update dashboard via HA's in-memory lovelace API. Returns True on success."""
+async def _save_via_lovelace_api(hass: HomeAssistant, config: dict) -> tuple[bool, bool]:
+    """Update dashboard via HA's in-memory lovelace API.
+
+    Returns (saved_live, was_new):
+      saved_live — config written to in-memory API
+      was_new    — dashboard entry did not exist before this call
+    """
     try:
         from homeassistant.components.lovelace.const import LOVELACE_DATA  # noqa: PLC0415
         from homeassistant.components.lovelace.dashboard import LovelaceStorage  # noqa: PLC0415
     except ImportError as exc:
         _LOGGER.warning("Cannot import lovelace internals: %s", exc)
-        return False
+        return False, False
 
     lovelace = hass.data.get(LOVELACE_DATA)
     if lovelace is None:
         _LOGGER.warning("Lovelace component not loaded in hass.data — cannot update in-memory")
-        return False
+        return False, False
 
     dash = lovelace.dashboards.get(_DASHBOARD_URL_PATH)
+    was_new = dash is None
 
-    if dash is None:
-        _LOGGER.warning(
-            "Dashboard '%s' not found in lovelace (registered keys: %s). Creating in-memory entry.",
-            _DASHBOARD_URL_PATH,
-            list(lovelace.dashboards.keys()),
-        )
+    if was_new:
+        _LOGGER.info("Dashboard '%s' not in lovelace yet — creating in-memory entry.", _DASHBOARD_URL_PATH)
         dash = LovelaceStorage(
             hass,
             {
@@ -150,10 +152,10 @@ async def _save_via_lovelace_api(hass: HomeAssistant, config: dict) -> bool:
     try:
         await dash.async_save(config)
         _LOGGER.info("Simulated Devices dashboard saved successfully")
-        return True
+        return True, was_new
     except Exception as exc:  # noqa: BLE001
         _LOGGER.warning("Dashboard async_save failed: %s", exc, exc_info=True)
-        return False
+        return False, was_new
 
 
 async def _ensure_dashboard_registered(hass: HomeAssistant) -> None:
@@ -182,25 +184,33 @@ async def async_generate_dashboard(hass: HomeAssistant) -> None:
     registry = er.async_get(hass)
     config = _build_dashboard(coordinators, registry)
 
-    saved_live = await _save_via_lovelace_api(hass, config)
+    # Always register in persistent storage so the dashboard survives a restart,
+    # regardless of whether the live API save succeeds.
+    await _ensure_dashboard_registered(hass)
+
+    saved_live, was_new = await _save_via_lovelace_api(hass, config)
 
     if not saved_live:
-        # Lovelace not loaded yet or dashboard not registered — write to store
         store = Store(hass, 1, _DASHBOARD_STORE_KEY)
         await store.async_save({"config": config})
-        await _ensure_dashboard_registered(hass)
 
     device_count = len(coordinators)
-    if saved_live:
+    if not saved_live:
         msg = (
-            f"Dashboard regenerated with {device_count} device(s). "
-            "Your browser will refresh automatically."
+            f"Dashboard saved with {device_count} device(s). "
+            "Restart Home Assistant to activate it, then navigate to "
+            "[/simulated-devices](/simulated-devices)."
+        )
+    elif was_new:
+        msg = (
+            f"Dashboard created with {device_count} device(s). "
+            "Refresh your browser or navigate to "
+            "[/simulated-devices](/simulated-devices)."
         )
     else:
         msg = (
-            f"Dashboard created with {device_count} device(s). "
-            "Navigate to [/simulated-devices](/simulated-devices) — "
-            "you may need to refresh your browser."
+            f"Dashboard regenerated with {device_count} device(s). "
+            "Your browser will refresh automatically."
         )
 
     await hass.services.async_call(
