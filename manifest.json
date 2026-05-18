@@ -1,0 +1,17 @@
+{
+  "domain": "simulated_devices",
+  "name": "Simulated Devices",
+  "codeowners": [],
+  "config_flow": true,
+  "documentation": "https://www.home-assistant.io/integrations/demo/",
+  "integration_type": "device",
+  "iot_class": "local_push",
+  "loggers": ["custom_components.simulated_devices"],
+  "zeroconf": [
+    {
+      "type": "_simulated-device._tcp.local."
+    }
+  ],
+  "requirements": [],
+  "version": "2.0.0"
+}

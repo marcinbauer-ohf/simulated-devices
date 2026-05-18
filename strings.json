@@ -1,0 +1,142 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add simulated device",
+        "menu_options": {
+          "single": "Add single device",
+          "batch": "Create all device types at once",
+          "generate_dashboard": "Generate dashboard",
+          "remove_all": "Remove all devices"
+        }
+      },
+      "remove_all": {
+        "title": "Remove all simulated devices",
+        "description": "This will permanently remove all {count} simulated device(s) and their entities. This cannot be undone.\n\nClick Submit to confirm."
+      },
+      "single": {
+        "title": "Add simulated device",
+        "description": "Create a new virtual device and its entities.",
+        "data": {
+          "name": "Name",
+          "device_type": "Device type",
+          "update_interval": "Update interval (seconds)",
+          "random_updates": "Enable random state changes",
+          "random_availability": "Enable random connectivity changes"
+        }
+      },
+      "batch": {
+        "title": "Create all device types",
+        "description": "Create one simulated device for each of the 24 supported device types. Each will be added as a separate device in Home Assistant.",
+        "data": {
+          "name_prefix": "Name prefix",
+          "update_interval": "Update interval (seconds)"
+        },
+        "data_description": {
+          "name_prefix": "Prepended to each device name, e.g. \"Sim\" → \"Sim Smart Light\". Leave blank to use the device type name as-is."
+        }
+      },
+      "zeroconf_confirm": {
+        "title": "Discovered simulated device",
+        "description": "A simulated device named {name} was discovered. Confirm to add it.",
+        "data": {
+          "name": "Name",
+          "device_type": "Device type",
+          "update_interval": "Update interval (seconds)",
+          "random_updates": "Enable random state changes",
+          "random_availability": "Enable random connectivity changes"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "A simulated device with this name and type already exists.",
+      "no_discovery_data": "Missing discovery details. Please try discovery again.",
+      "batch_initiated": "All 24 device types are being created in the background. They will appear in your devices list shortly.",
+      "dashboard_generated": "Dashboard generated. Navigate to Simulated Devices in the sidebar, or refresh your browser if it was already open.",
+      "all_devices_removed": "All simulated devices have been removed."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Simulated device options",
+        "description": "Tune how this device behaves.",
+        "data": {
+          "update_interval": "Update interval (seconds)",
+          "random_updates": "Enable random state changes",
+          "random_availability": "Enable random connectivity changes",
+          "simulation_profile": "Simulation profile"
+        },
+        "data_description": {
+          "simulation_profile": "Controls behavioral patterns: Random (pure random), Home (occupied daytime), Away (unoccupied), Night (sleeping hours)."
+        }
+      }
+    }
+  },
+  "services": {
+    "reset_battery": {
+      "name": "Reset Battery",
+      "description": "Reset the simulated battery level to 100%."
+    },
+    "force_state": {
+      "name": "Force State",
+      "description": "Override one or more state keys on a simulated device.",
+      "fields": {
+        "entry_id": {
+          "name": "Config Entry ID",
+          "description": "The config entry ID of the simulated device."
+        },
+        "state_updates": {
+          "name": "State Updates",
+          "description": "Dictionary of state key/value pairs to apply."
+        }
+      }
+    },
+    "trigger_event": {
+      "name": "Trigger Event",
+      "description": "Manually fire an event on a button device or doorbell.",
+      "fields": {
+        "entry_id": {
+          "name": "Config Entry ID",
+          "description": "The config entry ID of the simulated device."
+        },
+        "event_type": {
+          "name": "Event Type",
+          "description": "The event type to fire (e.g. single_press, double_press, long_press, press)."
+        }
+      }
+    },
+    "set_profile": {
+      "name": "Set Simulation Profile",
+      "description": "Change the simulation profile at runtime.",
+      "fields": {
+        "entry_id": {
+          "name": "Config Entry ID",
+          "description": "The config entry ID of the simulated device."
+        },
+        "profile": {
+          "name": "Profile",
+          "description": "One of: random, home, away, night."
+        }
+      }
+    },
+    "inject_fault": {
+      "name": "Inject Fault",
+      "description": "Instantly trigger a fault condition with optional auto-clear.",
+      "fields": {
+        "entry_id": {
+          "name": "Config Entry ID",
+          "description": "The config entry ID of the simulated device."
+        },
+        "fault_type": {
+          "name": "Fault Type",
+          "description": "The fault condition to inject: smoke_alarm, co_alarm, leak, motion, tamper, overload, battery_critical, offline."
+        },
+        "duration_seconds": {
+          "name": "Duration (seconds)",
+          "description": "Seconds before the fault auto-clears. Default is 30."
+        }
+      }
+    }
+  }
+}

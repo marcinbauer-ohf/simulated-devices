@@ -1,0 +1,120 @@
+generate_dashboard:
+  name: Generate Dashboard
+  description: >
+    Regenerate the "Simulated Devices" Lovelace dashboard based on all currently
+    configured simulated devices. Refresh your browser after calling this service.
+
+reset_battery:
+  name: Reset Battery
+  description: Reset the simulated battery level to 100%.
+  fields:
+    entry_id:
+      name: Config Entry ID
+      description: The config entry ID of the simulated device.
+      required: true
+      example: "abc123def456"
+      selector:
+        text:
+
+force_state:
+  name: Force State
+  description: Override one or more state keys on a simulated device.
+  fields:
+    entry_id:
+      name: Config Entry ID
+      description: The config entry ID of the simulated device.
+      required: true
+      example: "abc123def456"
+      selector:
+        text:
+    state_updates:
+      name: State Updates
+      description: Dictionary of state key/value pairs to apply to the device.
+      required: true
+      example: '{"is_on": true, "brightness": 128}'
+      selector:
+        object:
+
+trigger_event:
+  name: Trigger Event
+  description: Manually fire an event on a button device or doorbell.
+  fields:
+    entry_id:
+      name: Config Entry ID
+      description: The config entry ID of the simulated device.
+      required: true
+      example: "abc123def456"
+      selector:
+        text:
+    event_type:
+      name: Event Type
+      description: "The event type to fire. Button: single_press, double_press, long_press. Doorbell: press."
+      required: true
+      example: "single_press"
+      selector:
+        select:
+          options:
+            - single_press
+            - double_press
+            - long_press
+            - press
+
+set_profile:
+  name: Set Simulation Profile
+  description: Change the simulation profile at runtime to affect behavioral probabilities.
+  fields:
+    entry_id:
+      name: Config Entry ID
+      description: The config entry ID of the simulated device.
+      required: true
+      example: "abc123def456"
+      selector:
+        text:
+    profile:
+      name: Profile
+      description: "Simulation profile: random (pure random), home (occupied daytime), away (unoccupied), night (sleeping)."
+      required: true
+      selector:
+        select:
+          options:
+            - random
+            - home
+            - away
+            - night
+
+inject_fault:
+  name: Inject Fault
+  description: Instantly trigger a fault condition with optional auto-clear after a duration.
+  fields:
+    entry_id:
+      name: Config Entry ID
+      description: The config entry ID of the simulated device.
+      required: true
+      example: "abc123def456"
+      selector:
+        text:
+    fault_type:
+      name: Fault Type
+      description: "The fault condition to inject."
+      required: true
+      selector:
+        select:
+          options:
+            - smoke_alarm
+            - co_alarm
+            - leak
+            - motion
+            - tamper
+            - overload
+            - battery_critical
+            - offline
+    duration_seconds:
+      name: Duration (seconds)
+      description: Seconds before the fault auto-clears. Default is 30.
+      required: false
+      default: 30
+      selector:
+        number:
+          min: 1
+          max: 3600
+          unit_of_measurement: s
