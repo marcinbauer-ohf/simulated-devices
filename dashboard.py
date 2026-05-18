@@ -139,6 +139,7 @@ async def _save_via_lovelace_api(hass: HomeAssistant, config: dict) -> tuple[boo
         dash = LovelaceStorage(
             hass,
             {
+                "id": _DASHBOARD_ID,
                 "url_path": _DASHBOARD_URL_PATH,
                 "title": "Simulated Devices",
                 "icon": "mdi:robot-outline",
