@@ -6,21 +6,6 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.typing import ConfigType
 
-import logging as _logging
-
-# Pre-import platform modules so async_forward_entry_setups doesn't block the
-# event loop with synchronous importlib.import_module calls.
-_LOGGER_INIT = _logging.getLogger(__name__)
-for _mod in (
-    "alarm_control_panel", "binary_sensor", "climate", "cover",
-    "event", "fan", "humidifier", "light", "lock", "media_player",
-    "sensor", "siren", "switch", "vacuum", "valve",
-):
-    try:
-        __import__(f"custom_components.simulated_devices.{_mod}")
-    except Exception as _exc:  # noqa: BLE001
-        _LOGGER_INIT.error("Failed to pre-import platform %s: %s", _mod, _exc)
-del _mod
 from .const import DOMAIN, PLATFORMS
 from .coordinator import SimulatedDeviceCoordinator
 from .services import async_remove_services, async_setup_services

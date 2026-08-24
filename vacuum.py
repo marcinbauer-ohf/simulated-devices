@@ -45,7 +45,6 @@ class SimulatedRobotVacuumEntity(SimulatedEntity, StateVacuumEntity):
         VacuumEntityFeature.START
         | VacuumEntityFeature.STOP
         | VacuumEntityFeature.RETURN_HOME
-        | VacuumEntityFeature.BATTERY
         | VacuumEntityFeature.FAN_SPEED
         | VacuumEntityFeature.PAUSE
     )
@@ -58,11 +57,6 @@ class SimulatedRobotVacuumEntity(SimulatedEntity, StateVacuumEntity):
         return _STATUS_MAP.get(
             self.coordinator.data.get("status", "docked"), VacuumActivity.DOCKED
         )
-
-    @property
-    def battery_level(self) -> int | None:
-        batt = self.coordinator.data.get("battery")
-        return int(batt) if batt is not None else None
 
     @property
     def fan_speed(self) -> str | None:
