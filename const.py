@@ -65,6 +65,22 @@ DEVICE_TYPE_SOLAR_PANEL = "solar_panel"
 # Input
 DEVICE_TYPE_BUTTON_DEVICE = "button_device"
 
+# Vision
+DEVICE_TYPE_SECURITY_CAMERA = "security_camera"
+
+# Water/Outdoor
+DEVICE_TYPE_WATER_HEATER = "water_heater"
+DEVICE_TYPE_LAWN_MOWER = "lawn_mower"
+
+# Presence
+DEVICE_TYPE_PHONE_TRACKER = "phone_tracker"
+
+# Controller carrying the generic/config entity platforms
+DEVICE_TYPE_HOME_HUB = "home_hub"
+
+# Composite: one device carrying an instance of every type above
+DEVICE_TYPE_EVERYTHING = "everything"
+
 DEVICE_TYPES: dict[str, str] = {
     # Existing
     DEVICE_TYPE_SMART_LIGHT: "Smart Light",
@@ -98,24 +114,59 @@ DEVICE_TYPES: dict[str, str] = {
     DEVICE_TYPE_SOLAR_PANEL: "Solar Panel",
     # Input
     DEVICE_TYPE_BUTTON_DEVICE: "Button Device",
+    # Vision
+    DEVICE_TYPE_SECURITY_CAMERA: "Security Camera",
+    # Water/Outdoor
+    DEVICE_TYPE_WATER_HEATER: "Water Heater",
+    DEVICE_TYPE_LAWN_MOWER: "Lawn Mower",
+    # Presence
+    DEVICE_TYPE_PHONE_TRACKER: "Phone Tracker",
+    # Controller
+    DEVICE_TYPE_HOME_HUB: "Home Hub",
+    # Composite
+    DEVICE_TYPE_EVERYTHING: "Everything (all entity types)",
 }
+
+# Sub-types instantiated by the composite "Everything" device — every real type.
+EVERYTHING_SUB_TYPES: tuple[str, ...] = tuple(
+    t for t in DEVICE_TYPES if t != DEVICE_TYPE_EVERYTHING
+)
 
 PLATFORMS: tuple[Platform, ...] = (
     Platform.ALARM_CONTROL_PANEL,
     Platform.BINARY_SENSOR,
+    Platform.BUTTON,
+    Platform.CALENDAR,
+    Platform.CAMERA,
     Platform.CLIMATE,
     Platform.COVER,
+    Platform.DATE,
+    Platform.DATETIME,
+    Platform.DEVICE_TRACKER,
     Platform.EVENT,
     Platform.FAN,
     Platform.HUMIDIFIER,
+    Platform.IMAGE,
+    Platform.LAWN_MOWER,
     Platform.LIGHT,
     Platform.LOCK,
     Platform.MEDIA_PLAYER,
+    Platform.NOTIFY,
+    Platform.NUMBER,
+    Platform.REMOTE,
+    Platform.SCENE,
+    Platform.SELECT,
     Platform.SENSOR,
     Platform.SIREN,
     Platform.SWITCH,
+    Platform.TEXT,
+    Platform.TIME,
+    Platform.TODO,
+    Platform.UPDATE,
     Platform.VACUUM,
     Platform.VALVE,
+    Platform.WATER_HEATER,
+    Platform.WEATHER,
 )
 
 MIN_UPDATE_INTERVAL = 1
@@ -148,6 +199,12 @@ BATTERY_DRAIN_RATES: dict[str, float | None] = {
     DEVICE_TYPE_EV_CHARGER: None,
     DEVICE_TYPE_SOLAR_PANEL: None,
     DEVICE_TYPE_BUTTON_DEVICE: 0.001 / 3600,
+    DEVICE_TYPE_SECURITY_CAMERA: 0.02 / 3600,
+    DEVICE_TYPE_WATER_HEATER: None,
+    DEVICE_TYPE_LAWN_MOWER: None,  # handled specially in coordinator
+    DEVICE_TYPE_PHONE_TRACKER: 0.4 / 3600,
+    DEVICE_TYPE_HOME_HUB: None,
+    DEVICE_TYPE_EVERYTHING: None,
 }
 
 # Simulation profile constants

@@ -1,7 +1,7 @@
 # Simulated Devices — Home Assistant Custom Integration
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
-![Version](https://img.shields.io/badge/version-2.0.0-blue)
+![Version](https://img.shields.io/badge/version-2.1.0-blue)
 ![HA Version](https://img.shields.io/badge/HA-2026.5%2B-green)
 
 Simulate virtual smart home devices in Home Assistant for testing automations, dashboards, and integrations — without needing real hardware.
@@ -10,10 +10,11 @@ Simulate virtual smart home devices in Home Assistant for testing automations, d
 
 ## Features
 
-- **24 device types** across all major HA platforms
+- **28 device types** across 34 HA entity platforms
+- **"Everything" device** — one device carrying an instance of every entity type at once
 - **Realistic simulation** — state changes, battery drain, sensor drift
 - **Simulation profiles** — Random, Home, Away, Night
-- **One-click batch create** — spin up all 24 devices at once
+- **One-click batch create** — spin up all 28 devices at once
 - **Dashboard generator** — auto-builds a Lovelace dashboard from your devices
 - **5 services** — force state, inject faults, trigger events, reset battery, set profile
 - **Fault injection** — instantly trigger smoke, CO, leak, motion, overload, offline with auto-clear
@@ -34,6 +35,24 @@ Simulate virtual smart home devices in Home Assistant for testing automations, d
 | **Energy** | Energy Meter, EV Charger, Solar Panel, Smart Plug |
 | **Input** | Button Device |
 | **Infrastructure** | Garage Door |
+| **Vision** | Security Camera (generated video stills + snapshot image) |
+| **Water/Outdoor** | Water Heater, Lawn Mower |
+| **Presence** | Phone Tracker (device_tracker with GPS drift) |
+| **Controller** | Home Hub (number, select, text, date, datetime, time, todo, calendar, notify, remote, scenes) |
+| **Composite** | **Everything** — one device with all of the above |
+
+### The "Everything" device
+
+Pick **Everything (all entity types)** in *Add single device* to get a single HA
+device that owns an instance of every entity type this integration can produce —
+133 entities spanning all 34 platforms, on one device page.
+
+Internally it runs one coordinator per sub-type, so each sub-device keeps its own
+independent state (the light's `is_on` is not the siren's `is_on`). Entity names
+are prefixed with the sub-type, e.g. `Smart Light Light`, `Robot Vacuum Battery`.
+
+It is excluded from **Create all device types at once** — that batch creates the
+28 real types as separate devices.
 
 ---
 

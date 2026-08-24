@@ -14,7 +14,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from .const import DEVICE_TYPE_MEDIA_PLAYER
-from .coordinator import SimulatedDeviceCoordinator
+from .coordinator import SimulatedDeviceCoordinator, coordinators_for
 from .entity import SimulatedEntity
 
 _STATE_MAP = {
@@ -22,7 +22,6 @@ _STATE_MAP = {
     "paused": MediaPlayerState.PAUSED,
     "idle": MediaPlayerState.IDLE,
     "off": MediaPlayerState.OFF,
-    "standby": MediaPlayerState.STANDBY,
 }
 
 _REPEAT_MAP = {
@@ -38,10 +37,9 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up simulated media player entities."""
-    coordinator: SimulatedDeviceCoordinator = entry.runtime_data
-    if coordinator.device_type != DEVICE_TYPE_MEDIA_PLAYER:
-        return
-    async_add_entities([SimulatedMediaPlayerEntity(coordinator)])
+    async_add_entities(
+        SimulatedMediaPlayerEntity(c) for c in coordinators_for(entry, DEVICE_TYPE_MEDIA_PLAYER)
+    )
 
 
 class SimulatedMediaPlayerEntity(SimulatedEntity, MediaPlayerEntity):

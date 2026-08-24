@@ -9,7 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DEVICE_TYPE_SIREN
-from .coordinator import SimulatedDeviceCoordinator
+from .coordinator import SimulatedDeviceCoordinator, coordinators_for
 from .entity import SimulatedEntity
 
 
@@ -19,10 +19,9 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up simulated siren entities."""
-    coordinator: SimulatedDeviceCoordinator = entry.runtime_data
-    if coordinator.device_type != DEVICE_TYPE_SIREN:
-        return
-    async_add_entities([SimulatedSirenEntity(coordinator)])
+    async_add_entities(
+        SimulatedSirenEntity(c) for c in coordinators_for(entry, DEVICE_TYPE_SIREN)
+    )
 
 
 class SimulatedSirenEntity(SimulatedEntity, SirenEntity):
