@@ -27,7 +27,7 @@
       },
       "batch": {
         "title": "Create all device types",
-        "description": "Create one simulated device for each of the 24 supported device types. Each will be added as a separate device in Home Assistant.",
+        "description": "Create one simulated device for each of the 28 supported device types. Each will be added as a separate device in Home Assistant. The composite \"Everything\" device is excluded — add that one from \"Add single device\".",
         "data": {
           "name_prefix": "Name prefix",
           "update_interval": "Update interval (seconds)"
@@ -51,7 +51,7 @@
     "abort": {
       "already_configured": "A simulated device with this name and type already exists.",
       "no_discovery_data": "Missing discovery details. Please try discovery again.",
-      "batch_initiated": "All 24 device types are being created in the background. They will appear in your devices list shortly. Once they appear, use Generate dashboard to build the Lovelace dashboard.",
+      "batch_initiated": "All 28 device types are being created in the background. They will appear in your devices list shortly. Once they appear, use Generate dashboard to build the Lovelace dashboard.",
       "dashboard_generated": "Dashboard generated. Navigate to Simulated Devices in the sidebar, or refresh your browser if it was already open.",
       "all_devices_removed": "All simulated devices have been removed."
     }

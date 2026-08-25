@@ -37,6 +37,14 @@ def _card_for_entity(entity_id: str) -> dict:
         return {"type": "media-control", "entity": entity_id}
     if domain == "alarm_control_panel":
         return {"type": "alarm-panel", "entity": entity_id}
+    if domain == "weather":
+        return {"type": "weather-forecast", "entity": entity_id, "forecast_type": "daily"}
+    if domain in ("camera", "image"):
+        return {"type": "picture-entity", "entity": entity_id, "camera_view": "auto"}
+    if domain == "todo":
+        return {"type": "todo-list", "entity": entity_id}
+    if domain == "calendar":
+        return {"type": "calendar", "entities": [entity_id]}
     return _tile(entity_id)
 
 
@@ -46,17 +54,21 @@ def _is_primary(entity_id: str) -> bool:
     return domain in (
         "light", "switch", "cover", "fan", "lock", "vacuum", "valve",
         "siren", "humidifier", "climate", "media_player", "alarm_control_panel",
+        "water_heater", "lawn_mower", "remote", "camera", "weather",
     )
 
 
 def _build_dashboard(
-    coordinators: dict,
+    coordinators: dict[str, list],
     registry: er.EntityRegistry,
 ) -> dict[str, Any]:
     """Build a full Lovelace dashboard config dict."""
     sections: list[dict] = []
 
-    for entry_id, coordinator in coordinators.items():
+    for entry_id, entry_coordinators in coordinators.items():
+        # An entry owns a list of coordinators (one per simulated sub-type);
+        # they all describe the same device, so the first one names the section.
+        coordinator = entry_coordinators[0]
         entries = er.async_entries_for_config_entry(registry, entry_id)
         if not entries:
             continue

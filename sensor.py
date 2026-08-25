@@ -34,7 +34,10 @@ from .const import (
     DEVICE_TYPE_GARAGE_DOOR,
     DEVICE_TYPE_HUMIDIFIER,
     DEVICE_TYPE_MOTION_SENSOR,
+    DEVICE_TYPE_LAWN_MOWER,
+    DEVICE_TYPE_PHONE_TRACKER,
     DEVICE_TYPE_ROBOT_VACUUM,
+    DEVICE_TYPE_SECURITY_CAMERA,
     DEVICE_TYPE_SIREN,
     DEVICE_TYPE_SMART_BLIND,
     DEVICE_TYPE_SMART_FAN,
@@ -45,6 +48,7 @@ from .const import (
     DEVICE_TYPE_SMOKE_CO_DETECTOR,
     DEVICE_TYPE_SOLAR_PANEL,
     DEVICE_TYPE_THERMOSTAT,
+    DEVICE_TYPE_WATER_HEATER,
     DEVICE_TYPE_WATER_LEAK,
     DEVICE_TYPE_WEATHER_STATION,
 )
@@ -368,6 +372,30 @@ _BUTTON_DEVICE_SENSORS: tuple[SensorEntityDescription, ...] = (_BATTERY_SENSOR,)
 # Registry
 # ---------------------------------------------------------------------------
 
+_SECURITY_CAMERA_SENSORS: tuple[SensorEntityDescription, ...] = (_BATTERY_SENSOR,)
+
+_PHONE_TRACKER_SENSORS: tuple[SensorEntityDescription, ...] = (_BATTERY_SENSOR,)
+
+_WATER_HEATER_SENSORS: tuple[SensorEntityDescription, ...] = (
+    SensorEntityDescription(
+        key="current_temp",
+        name="Water Temperature",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+)
+
+_LAWN_MOWER_SENSORS: tuple[SensorEntityDescription, ...] = (
+    _BATTERY_SENSOR,
+    SensorEntityDescription(
+        key="mowed_area_m2",
+        name="Mowed Area",
+        native_unit_of_measurement="m²",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+    ),
+)
+
 _SENSORS_BY_DEVICE_TYPE: dict[str, tuple[SensorEntityDescription, ...]] = {
     DEVICE_TYPE_SMART_LIGHT: _LIGHT_SENSORS,
     DEVICE_TYPE_SMART_PLUG: _PLUG_SENSORS,
@@ -391,6 +419,10 @@ _SENSORS_BY_DEVICE_TYPE: dict[str, tuple[SensorEntityDescription, ...]] = {
     DEVICE_TYPE_DOORBELL: _DOORBELL_SENSORS,
     DEVICE_TYPE_SIREN: _SIREN_SENSORS,
     DEVICE_TYPE_BUTTON_DEVICE: _BUTTON_DEVICE_SENSORS,
+    DEVICE_TYPE_SECURITY_CAMERA: _SECURITY_CAMERA_SENSORS,
+    DEVICE_TYPE_WATER_HEATER: _WATER_HEATER_SENSORS,
+    DEVICE_TYPE_LAWN_MOWER: _LAWN_MOWER_SENSORS,
+    DEVICE_TYPE_PHONE_TRACKER: _PHONE_TRACKER_SENSORS,
 }
 
 
@@ -400,10 +432,10 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up simulated sensors."""
-    coordinator: SimulatedDeviceCoordinator = entry.runtime_data
-    descriptions = _SENSORS_BY_DEVICE_TYPE.get(coordinator.device_type, ())
     async_add_entities(
-        [SimulatedValueSensor(coordinator, desc) for desc in descriptions]
+        SimulatedValueSensor(coordinator, desc)
+        for coordinator in entry.runtime_data
+        for desc in _SENSORS_BY_DEVICE_TYPE.get(coordinator.device_type, ())
     )
 
 
