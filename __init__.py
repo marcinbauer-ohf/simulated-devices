@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.typing import ConfigType
 
 from .const import (
@@ -27,11 +28,31 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
+def _remove_dashboard_button_entities(
+    hass: HomeAssistant, entry: SimulatedDevicesConfigEntry
+) -> None:
+    """Clean up the per-device Generate Dashboard button that 2.1.0 added.
+
+    The dashboard is still reachable from the integration menu and from the
+    simulated_devices.generate_dashboard service, so the button was redundant
+    noise on every device. Without this, dropping the platform would leave its
+    registry entries behind as unavailable entities.
+
+    ponytail: delete this once nobody is upgrading from 2.1.0 any more.
+    """
+    registry = er.async_get(hass)
+    for stale in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if stale.domain == "button":
+            registry.async_remove(stale.entity_id)
+
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: SimulatedDevicesConfigEntry
 ) -> bool:
     """Set up simulated devices from a config entry."""
     hass.data.setdefault(DOMAIN, {})
+
+    _remove_dashboard_button_entities(hass, entry)
 
     device_type = entry.data[CONF_DEVICE_TYPE]
     sub_types = (

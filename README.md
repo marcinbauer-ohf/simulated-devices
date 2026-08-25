@@ -1,7 +1,7 @@
 # Simulated Devices — Home Assistant Custom Integration
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
-![Version](https://img.shields.io/badge/version-2.1.0-blue)
+![Version](https://img.shields.io/badge/version-2.1.1-blue)
 ![HA Version](https://img.shields.io/badge/HA-2026.5%2B-green)
 
 Simulate virtual smart home devices in Home Assistant for testing automations, dashboards, and integrations — without needing real hardware.
@@ -10,7 +10,7 @@ Simulate virtual smart home devices in Home Assistant for testing automations, d
 
 ## Features
 
-- **28 device types** across 34 HA entity platforms
+- **28 device types** across 33 HA entity platforms
 - **"Everything" device** — one device carrying an instance of every entity type at once
 - **Realistic simulation** — state changes, battery drain, sensor drift
 - **Simulation profiles** — Random, Home, Away, Night
@@ -45,7 +45,7 @@ Simulate virtual smart home devices in Home Assistant for testing automations, d
 
 Pick **Everything (all entity types)** in *Add single device* to get a single HA
 device that owns an instance of every entity type this integration can produce —
-133 entities spanning all 34 platforms, on one device page.
+132 entities spanning all 33 platforms, on one device page.
 
 Internally it runs one coordinator per sub-type, so each sub-device keeps its own
 independent state (the light's `is_on` is not the siren's `is_on`). Entity names

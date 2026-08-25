@@ -135,7 +135,6 @@ EVERYTHING_SUB_TYPES: tuple[str, ...] = tuple(
 PLATFORMS: tuple[Platform, ...] = (
     Platform.ALARM_CONTROL_PANEL,
     Platform.BINARY_SENSOR,
-    Platform.BUTTON,
     Platform.CALENDAR,
     Platform.CAMERA,
     Platform.CLIMATE,
