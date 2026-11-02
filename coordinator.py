@@ -30,11 +30,16 @@ from .const import (
     DEVICE_TYPE_DOORBELL,
     DEVICE_TYPE_ENERGY_METER,
     DEVICE_TYPE_EV_CHARGER,
+    DEVICE_TYPE_EVERYTHING,
     DEVICE_TYPE_GARAGE_DOOR,
+    DEVICE_TYPE_HOME_HUB,
     DEVICE_TYPE_HUMIDIFIER,
+    DEVICE_TYPE_LAWN_MOWER,
     DEVICE_TYPE_MEDIA_PLAYER,
     DEVICE_TYPE_MOTION_SENSOR,
+    DEVICE_TYPE_PHONE_TRACKER,
     DEVICE_TYPE_ROBOT_VACUUM,
+    DEVICE_TYPE_SECURITY_CAMERA,
     DEVICE_TYPE_SIREN,
     DEVICE_TYPE_SMART_BLIND,
     DEVICE_TYPE_SMART_FAN,
@@ -45,6 +50,7 @@ from .const import (
     DEVICE_TYPE_SMOKE_CO_DETECTOR,
     DEVICE_TYPE_SOLAR_PANEL,
     DEVICE_TYPE_THERMOSTAT,
+    DEVICE_TYPE_WATER_HEATER,
     DEVICE_TYPE_WATER_LEAK,
     DEVICE_TYPE_WEATHER_STATION,
     DOMAIN,
@@ -78,9 +84,16 @@ _MEDIA_TRACKS = [
 class SimulatedDeviceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     """Coordinator managing state for one simulated device."""
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+    def __init__(
+        self, hass: HomeAssistant, entry: ConfigEntry, device_type: str | None = None
+    ) -> None:
         self.config_entry = entry
-        self.device_type: str = entry.data[CONF_DEVICE_TYPE]
+        # The type the config entry was created as. For the composite
+        # "Everything" device this stays EVERYTHING while device_type below
+        # names the individual sub-device this coordinator simulates.
+        self.entry_device_type: str = entry.data[CONF_DEVICE_TYPE]
+        self.device_type: str = device_type or self.entry_device_type
+        self.is_composite: bool = self.entry_device_type == DEVICE_TYPE_EVERYTHING
         self.device_name: str = entry.title
         self.simulation_profile: str = self._get_option_raw(
             entry, CONF_SIMULATION_PROFILE, DEFAULT_SIMULATION_PROFILE
@@ -94,7 +107,7 @@ class SimulatedDeviceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         super().__init__(
             hass,
             _LOGGER,
-            name=f"{DOMAIN}_{entry.entry_id}",
+            name=f"{DOMAIN}_{entry.entry_id}_{self.device_type}",
             update_interval=update_interval,
         )
 
@@ -152,7 +165,12 @@ class SimulatedDeviceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # ------------------------------------------------------------------
 
     def _build_initial_state(self) -> dict[str, Any]:
-        base: dict[str, Any] = {"connected": True}
+        base: dict[str, Any] = {
+            "connected": True,
+            "firmware_version": "1.0.0",
+            "latest_version": "1.1.0",
+            "update_progress": None,
+        }
         drain_rate = BATTERY_DRAIN_RATES.get(self.device_type)
         if drain_rate is not None:
             base["battery"] = 100.0
@@ -182,6 +200,11 @@ class SimulatedDeviceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             DEVICE_TYPE_EV_CHARGER: self._init_ev_charger,
             DEVICE_TYPE_SOLAR_PANEL: self._init_solar_panel,
             DEVICE_TYPE_BUTTON_DEVICE: self._init_button_device,
+            DEVICE_TYPE_SECURITY_CAMERA: self._init_security_camera,
+            DEVICE_TYPE_WATER_HEATER: self._init_water_heater,
+            DEVICE_TYPE_LAWN_MOWER: self._init_lawn_mower,
+            DEVICE_TYPE_PHONE_TRACKER: self._init_phone_tracker,
+            DEVICE_TYPE_HOME_HUB: self._init_home_hub,
         }
         builder = builders.get(self.device_type)
         if builder:
@@ -201,7 +224,14 @@ class SimulatedDeviceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return {"is_on": False, "power_w": 0.0, "energy_kwh": 0.0}
 
     def _init_weather_station(self) -> dict:
-        return {"temperature_c": 21.5, "humidity_pct": 45.0}
+        return {
+            "temperature_c": 21.5,
+            "humidity_pct": 45.0,
+            "pressure_hpa": 1013.0,
+            "wind_speed_kmh": 8.0,
+            "wind_bearing": 180,
+            "condition": "partlycloudy",
+        }
 
     def _init_garage_door(self) -> dict:
         return {"is_open": False, "position": 0, "obstruction": False}
@@ -344,6 +374,62 @@ class SimulatedDeviceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def _init_button_device(self) -> dict:
         return {"last_event": None, "last_event_time": None}
 
+    def _init_security_camera(self) -> dict:
+        return {
+            "recording": True,
+            "streaming": True,
+            "motion": False,
+            "frame": 0,
+            "last_snapshot": None,
+        }
+
+    def _init_water_heater(self) -> dict:
+        return {
+            "is_on": True,
+            "current_temp": 55.0,
+            "target_temp": 60.0,
+            "operation_mode": "eco",
+            "away_mode": False,
+            "heating": False,
+        }
+
+    def _init_lawn_mower(self) -> dict:
+        return {
+            "activity": "docked",
+            "battery": 100.0,
+            "mowed_area_m2": 0.0,
+            "error": False,
+        }
+
+    def _init_phone_tracker(self) -> dict:
+        return {
+            "location_name": "home",
+            "latitude": self.hass.config.latitude,
+            "longitude": self.hass.config.longitude,
+            "gps_accuracy": 12,
+            "battery": 100.0,
+        }
+
+    def _init_home_hub(self) -> dict:
+        now = dt_util.now()
+        return {
+            "number_value": 21.5,
+            "select_option": "Comfort",
+            "text_value": "Simulated",
+            "date_value": now.date().isoformat(),
+            "datetime_value": now.replace(microsecond=0).isoformat(),
+            "time_value": "07:30:00",
+            "remote_on": False,
+            "remote_activity": "Watch TV",
+            "last_notification": None,
+            "scene_applied": None,
+            "todo_items": [
+                {"uid": "1", "summary": "Replace air filter", "status": "needs_action"},
+                {"uid": "2", "summary": "Test smoke alarms", "status": "needs_action"},
+                {"uid": "3", "summary": "Descale kettle", "status": "completed"},
+            ],
+        }
+
     # ------------------------------------------------------------------
     # HA coordinator interface
     # ------------------------------------------------------------------
@@ -365,7 +451,10 @@ class SimulatedDeviceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # Battery drain — robot vacuum handled inside its own updater
         drain_rate = BATTERY_DRAIN_RATES.get(self.device_type)
-        if drain_rate is not None and "battery" in new_state and self.device_type != DEVICE_TYPE_ROBOT_VACUUM:
+        if drain_rate is not None and "battery" in new_state and self.device_type not in (
+            DEVICE_TYPE_ROBOT_VACUUM,
+            DEVICE_TYPE_LAWN_MOWER,
+        ):
             drain = drain_rate * interval_s * 100
             if self.device_type == DEVICE_TYPE_SIREN and new_state.get("is_on"):
                 drain *= 10
@@ -401,6 +490,11 @@ class SimulatedDeviceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 DEVICE_TYPE_EV_CHARGER: self._update_ev_charger,
                 DEVICE_TYPE_SOLAR_PANEL: self._update_solar_panel,
                 DEVICE_TYPE_BUTTON_DEVICE: self._update_button_device,
+                DEVICE_TYPE_SECURITY_CAMERA: self._update_security_camera,
+                DEVICE_TYPE_WATER_HEATER: self._update_water_heater,
+                DEVICE_TYPE_LAWN_MOWER: self._update_lawn_mower,
+                DEVICE_TYPE_PHONE_TRACKER: self._update_phone_tracker,
+                DEVICE_TYPE_HOME_HUB: self._update_home_hub,
             }
             updater = updaters.get(self.device_type)
             if updater:
@@ -450,6 +544,18 @@ class SimulatedDeviceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         s["humidity_pct"] = round(
             max(0.0, min(100.0, s["humidity_pct"] + random.uniform(-1.5, 1.5))), 1
         )
+        s["pressure_hpa"] = round(
+            max(950.0, min(1060.0, s.get("pressure_hpa", 1013.0) + random.uniform(-0.4, 0.4))), 1
+        )
+        s["wind_speed_kmh"] = round(
+            max(0.0, min(120.0, s.get("wind_speed_kmh", 8.0) + random.uniform(-1.5, 1.5))), 1
+        )
+        s["wind_bearing"] = int((s.get("wind_bearing", 180) + random.randint(-8, 8)) % 360)
+        if random.random() < 0.02:
+            s["condition"] = random.choice(
+                ["sunny", "partlycloudy", "cloudy", "rainy", "pouring",
+                 "windy", "fog", "snowy", "lightning-rainy", "clear-night"]
+            )
 
     def _update_garage_door(self, s: dict, interval_s: float) -> None:
         if random.random() < 0.02:
@@ -773,3 +879,87 @@ class SimulatedDeviceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if random.random() < 0.02:
             s["last_event"] = random.choice(["single_press", "double_press", "long_press"])
             s["last_event_time"] = dt_util.utcnow().isoformat()
+
+
+    def _update_security_camera(self, s: dict, interval_s: float) -> None:
+        s["frame"] = (s.get("frame", 0) + 1) % 3600
+        if random.random() < self._motion_probability():
+            s["motion"] = not s["motion"]
+            if s["motion"]:
+                s["last_snapshot"] = dt_util.utcnow().isoformat()
+
+    def _update_water_heater(self, s: dict, interval_s: float) -> None:
+        if not s["is_on"] or s["away_mode"]:
+            s["heating"] = False
+            s["current_temp"] = round(
+                max(15.0, s["current_temp"] - 0.02 * interval_s / 60), 1
+            )
+            return
+        diff = s["target_temp"] - s["current_temp"]
+        s["heating"] = diff > 0.5
+        s["current_temp"] = round(
+            s["current_temp"] + diff * 0.04 + random.uniform(-0.1, 0.1), 1
+        )
+
+    def _update_lawn_mower(self, s: dict, interval_s: float) -> None:
+        activity = s["activity"]
+        if activity == "mowing":
+            s["battery"] = max(0.0, round(s["battery"] - 1.2 * interval_s / 60, 3))
+            s["mowed_area_m2"] = round(s["mowed_area_m2"] + 0.5 * interval_s, 2)
+            if s["battery"] < 15 or random.random() < 0.01:
+                s["activity"] = "returning"
+        elif activity == "returning":
+            s["battery"] = max(0.0, round(s["battery"] - 0.5 * interval_s / 60, 3))
+            if random.random() < 0.2:
+                s["activity"] = "docked"
+        elif activity == "docked":
+            s["battery"] = min(100.0, round(s["battery"] + 0.9 * interval_s / 60, 3))
+            if s["battery"] >= 100.0 and random.random() < 0.04:
+                s["activity"] = "mowing"
+                s["mowed_area_m2"] = 0.0
+        if random.random() < 0.005:
+            s["error"] = not s["error"]
+            if s["error"]:
+                s["activity"] = "error"
+            else:
+                s["activity"] = "docked"
+
+    def _update_phone_tracker(self, s: dict, interval_s: float) -> None:
+        home_lat = self.hass.config.latitude
+        home_lon = self.hass.config.longitude
+        if random.random() < 0.03:
+            s["location_name"] = random.choice(["home", "not_home", "Work", "Gym"])
+        if s["location_name"] == "home":
+            s["latitude"] = round(home_lat + random.uniform(-0.0002, 0.0002), 6)
+            s["longitude"] = round(home_lon + random.uniform(-0.0002, 0.0002), 6)
+            s["gps_accuracy"] = random.randint(5, 20)
+            s["battery"] = min(100.0, round(s["battery"] + 0.5 * interval_s / 60, 2))
+        else:
+            s["latitude"] = round(s["latitude"] + random.uniform(-0.002, 0.002), 6)
+            s["longitude"] = round(s["longitude"] + random.uniform(-0.002, 0.002), 6)
+            s["gps_accuracy"] = random.randint(10, 80)
+
+    def _update_home_hub(self, s: dict, interval_s: float) -> None:
+        if random.random() < 0.05:
+            s["number_value"] = round(
+                max(5.0, min(35.0, s["number_value"] + random.uniform(-0.5, 0.5))), 1
+            )
+        if random.random() < 0.02:
+            s["select_option"] = random.choice(
+                ["Comfort", "Eco", "Boost", "Away", "Sleep"]
+            )
+        if random.random() < 0.01:
+            s["remote_on"] = not s["remote_on"]
+
+
+def coordinators_for(
+    entry: ConfigEntry, *device_types: str
+) -> list[SimulatedDeviceCoordinator]:
+    """Return the entry's coordinators simulating any of the given device types.
+
+    A normal entry owns a single coordinator, so this yields zero or one. The
+    composite "Everything" entry owns one per sub-type, so a platform that
+    serves several types gets one coordinator for each.
+    """
+    wanted = set(device_types)
+    return [c for c in entry.runtime_data if c.device_type in wanted]

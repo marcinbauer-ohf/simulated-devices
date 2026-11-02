@@ -13,7 +13,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DEVICE_TYPE_GARAGE_DOOR, DEVICE_TYPE_SMART_BLIND
-from .coordinator import SimulatedDeviceCoordinator
+from .coordinator import SimulatedDeviceCoordinator, coordinators_for
 from .entity import SimulatedEntity
 
 
@@ -23,11 +23,10 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up simulated cover entities."""
-    coordinator: SimulatedDeviceCoordinator = entry.runtime_data
-    if coordinator.device_type == DEVICE_TYPE_GARAGE_DOOR:
-        async_add_entities([SimulatedGarageDoorEntity(coordinator)])
-    elif coordinator.device_type == DEVICE_TYPE_SMART_BLIND:
-        async_add_entities([SimulatedBlindEntity(coordinator)])
+    async_add_entities(
+        [SimulatedGarageDoorEntity(c) for c in coordinators_for(entry, DEVICE_TYPE_GARAGE_DOOR)]
+        + [SimulatedBlindEntity(c) for c in coordinators_for(entry, DEVICE_TYPE_SMART_BLIND)]
+    )
 
 
 class SimulatedGarageDoorEntity(SimulatedEntity, CoverEntity):

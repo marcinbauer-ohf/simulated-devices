@@ -27,7 +27,7 @@
       },
       "batch": {
         "title": "Create all device types",
-        "description": "Create one simulated device for each of the 24 supported device types. Each will be added as a separate device in Home Assistant.",
+        "description": "Create one simulated device for each of the 28 supported device types. Each will be added as a separate device in Home Assistant. The composite \"Everything\" device is excluded — add that one from \"Add single device\".",
         "data": {
           "name_prefix": "Name prefix",
           "update_interval": "Update interval (seconds)"

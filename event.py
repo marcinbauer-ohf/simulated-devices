@@ -7,7 +7,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DEVICE_TYPE_BUTTON_DEVICE, DEVICE_TYPE_DOORBELL
-from .coordinator import SimulatedDeviceCoordinator
+from .coordinator import SimulatedDeviceCoordinator, coordinators_for
 from .entity import SimulatedEntity
 
 
@@ -17,11 +17,10 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up simulated event entities."""
-    coordinator: SimulatedDeviceCoordinator = entry.runtime_data
-    if coordinator.device_type == DEVICE_TYPE_BUTTON_DEVICE:
-        async_add_entities([SimulatedButtonEventEntity(coordinator)])
-    elif coordinator.device_type == DEVICE_TYPE_DOORBELL:
-        async_add_entities([SimulatedDoorbellEventEntity(coordinator)])
+    async_add_entities(
+        [SimulatedButtonEventEntity(c) for c in coordinators_for(entry, DEVICE_TYPE_BUTTON_DEVICE)]
+        + [SimulatedDoorbellEventEntity(c) for c in coordinators_for(entry, DEVICE_TYPE_DOORBELL)]
+    )
 
 
 class SimulatedButtonEventEntity(SimulatedEntity, EventEntity):

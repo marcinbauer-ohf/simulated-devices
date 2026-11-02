@@ -19,7 +19,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DEVICE_TYPE_SMART_LIGHT
-from .coordinator import SimulatedDeviceCoordinator
+from .coordinator import SimulatedDeviceCoordinator, coordinators_for
 from .entity import SimulatedEntity
 
 _EFFECTS = ["none", "colorloop", "flash", "random", "strobe"]
@@ -31,10 +31,9 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the simulated light for a config entry."""
-    coordinator: SimulatedDeviceCoordinator = entry.runtime_data
-    if coordinator.device_type != DEVICE_TYPE_SMART_LIGHT:
-        return
-    async_add_entities([SimulatedLightEntity(coordinator)])
+    async_add_entities(
+        SimulatedLightEntity(c) for c in coordinators_for(entry, DEVICE_TYPE_SMART_LIGHT)
+    )
 
 
 class SimulatedLightEntity(SimulatedEntity, LightEntity):

@@ -37,6 +37,10 @@ from .const import (
     DEVICE_TYPE_WATER_LEAK,
     DEVICE_TYPE_WEATHER_STATION,
     DEVICE_TYPE_BUTTON_DEVICE,
+    DEVICE_TYPE_HOME_HUB,
+    DEVICE_TYPE_LAWN_MOWER,
+    DEVICE_TYPE_SECURITY_CAMERA,
+    DEVICE_TYPE_WATER_HEATER,
 )
 from .coordinator import SimulatedDeviceCoordinator
 from .entity import SimulatedEntity
@@ -75,6 +79,10 @@ _DEVICES_WITH_CONNECTIVITY = {
     DEVICE_TYPE_DOORBELL,
     DEVICE_TYPE_SMART_FAN,
     DEVICE_TYPE_BUTTON_DEVICE,
+    DEVICE_TYPE_SECURITY_CAMERA,
+    DEVICE_TYPE_WATER_HEATER,
+    DEVICE_TYPE_LAWN_MOWER,
+    DEVICE_TYPE_HOME_HUB,
 }
 
 _BINARY_SENSORS_BY_DEVICE_TYPE: dict[str, tuple[SimulatedBinarySensorDescription, ...]] = {
@@ -185,6 +193,32 @@ _BINARY_SENSORS_BY_DEVICE_TYPE: dict[str, tuple[SimulatedBinarySensorDescription
             device_class=BinarySensorDeviceClass.MOTION,
         ),
     ),
+    DEVICE_TYPE_SECURITY_CAMERA: (
+        SimulatedBinarySensorDescription(
+            key="motion",
+            name="Motion",
+            device_class=BinarySensorDeviceClass.MOTION,
+        ),
+        SimulatedBinarySensorDescription(
+            key="recording",
+            name="Recording",
+            device_class=BinarySensorDeviceClass.RUNNING,
+        ),
+    ),
+    DEVICE_TYPE_WATER_HEATER: (
+        SimulatedBinarySensorDescription(
+            key="heating",
+            name="Heating",
+            device_class=BinarySensorDeviceClass.HEAT,
+        ),
+    ),
+    DEVICE_TYPE_LAWN_MOWER: (
+        SimulatedBinarySensorDescription(
+            key="error",
+            name="Problem",
+            device_class=BinarySensorDeviceClass.PROBLEM,
+        ),
+    ),
 }
 
 
@@ -194,14 +228,13 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up simulated binary sensors."""
-    coordinator: SimulatedDeviceCoordinator = entry.runtime_data
     entities: list[BinarySensorEntity] = []
 
-    if coordinator.device_type in _DEVICES_WITH_CONNECTIVITY:
-        entities.append(SimulatedConnectivityBinarySensor(coordinator))
-
-    for desc in _BINARY_SENSORS_BY_DEVICE_TYPE.get(coordinator.device_type, ()):
-        entities.append(SimulatedBinarySensor(coordinator, desc))
+    for coordinator in entry.runtime_data:
+        if coordinator.device_type in _DEVICES_WITH_CONNECTIVITY:
+            entities.append(SimulatedConnectivityBinarySensor(coordinator))
+        for desc in _BINARY_SENSORS_BY_DEVICE_TYPE.get(coordinator.device_type, ()):
+            entities.append(SimulatedBinarySensor(coordinator, desc))
 
     async_add_entities(entities)
 

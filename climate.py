@@ -15,7 +15,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DEVICE_TYPE_THERMOSTAT
-from .coordinator import SimulatedDeviceCoordinator
+from .coordinator import SimulatedDeviceCoordinator, coordinators_for
 from .entity import SimulatedEntity
 
 _HVAC_MODE_MAP = {
@@ -39,10 +39,9 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up simulated climate entities."""
-    coordinator: SimulatedDeviceCoordinator = entry.runtime_data
-    if coordinator.device_type != DEVICE_TYPE_THERMOSTAT:
-        return
-    async_add_entities([SimulatedThermostatEntity(coordinator)])
+    async_add_entities(
+        SimulatedThermostatEntity(c) for c in coordinators_for(entry, DEVICE_TYPE_THERMOSTAT)
+    )
 
 
 class SimulatedThermostatEntity(SimulatedEntity, ClimateEntity):

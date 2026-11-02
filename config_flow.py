@@ -27,6 +27,7 @@ from .const import (
     DEFAULT_UPDATE_INTERVAL,
     DEVICE_TYPES,
     DOMAIN,
+    EVERYTHING_SUB_TYPES,
     MAX_UPDATE_INTERVAL,
     MIN_UPDATE_INTERVAL,
     SIMULATION_PROFILES,
@@ -179,7 +180,10 @@ class SimulatedDevicesConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             prefix = user_input.get("name_prefix", "").strip()
             interval = user_input[CONF_UPDATE_INTERVAL]
-            for device_type, display_name in DEVICE_TYPES.items():
+            # Real types only — the composite "Everything" device is not part
+            # of a batch, it already contains one of each.
+            for device_type in EVERYTHING_SUB_TYPES:
+                display_name = DEVICE_TYPES[device_type]
                 name = f"{prefix} {display_name}".strip() if prefix else display_name
                 self.hass.async_create_task(
                     self.hass.config_entries.flow.async_init(

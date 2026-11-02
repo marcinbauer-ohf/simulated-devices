@@ -57,54 +57,90 @@ _SCHEMA_INJECT_FAULT = vol.Schema(
 )
 
 
-def _get_coordinator(hass: HomeAssistant, call: ServiceCall) -> SimulatedDeviceCoordinator:
+def _get_coordinators(
+    hass: HomeAssistant, call: ServiceCall
+) -> list[SimulatedDeviceCoordinator]:
+    """Return every coordinator behind a config entry.
+
+    A normal device has one. The composite "Everything" device has one per
+    sub-type, and a service call targets all of them.
+    """
     entry_id: str = call.data["entry_id"]
-    coordinator: SimulatedDeviceCoordinator | None = hass.data.get(DOMAIN, {}).get(entry_id)
-    if coordinator is None:
+    coordinators: list[SimulatedDeviceCoordinator] | None = hass.data.get(
+        DOMAIN, {}
+    ).get(entry_id)
+    if not coordinators:
         raise ValueError(f"No simulated device with entry_id={entry_id!r}")
-    return coordinator
+    return coordinators
+
+
+def _applicable(
+    coordinator: SimulatedDeviceCoordinator, updates: dict[str, Any]
+) -> dict[str, Any]:
+    """Narrow an update to keys a sub-device simulates.
+
+    Only the composite device needs this: its sub-coordinators each hold a
+    different slice of state, so an unfiltered push would scatter foreign keys
+    across all of them. A single device keeps the old behaviour of accepting
+    whatever it is given.
+    """
+    if not coordinator.is_composite:
+        return updates
+    return {k: v for k, v in updates.items() if k in coordinator.data}
 
 
 async def async_setup_services(hass: HomeAssistant) -> None:
     """Register all simulated_devices services."""
 
     async def handle_reset_battery(call: ServiceCall) -> None:
-        coordinator = _get_coordinator(hass, call)
-        coordinator.set_state(battery=100.0)
+        for coordinator in _get_coordinators(hass, call):
+            if "battery" in coordinator.data:
+                coordinator.set_state(battery=100.0)
 
     async def handle_force_state(call: ServiceCall) -> None:
-        coordinator = _get_coordinator(hass, call)
-        coordinator.set_state(**call.data["state_updates"])
+        updates = call.data["state_updates"]
+        for coordinator in _get_coordinators(hass, call):
+            if applicable := _applicable(coordinator, updates):
+                coordinator.set_state(**applicable)
 
     async def handle_trigger_event(call: ServiceCall) -> None:
-        coordinator = _get_coordinator(hass, call)
         event_type = call.data["event_type"]
-        coordinator.set_state(
-            last_event=event_type,
-            last_event_time=dt_util.utcnow().isoformat(),
-            last_press_time=dt_util.utcnow().isoformat(),
-        )
+        now = dt_util.utcnow().isoformat()
+        for coordinator in _get_coordinators(hass, call):
+            coordinator.set_state(
+                last_event=event_type,
+                last_event_time=now,
+                last_press_time=now,
+            )
 
     async def handle_set_profile(call: ServiceCall) -> None:
-        coordinator = _get_coordinator(hass, call)
-        coordinator.simulation_profile = call.data["profile"]
+        for coordinator in _get_coordinators(hass, call):
+            coordinator.simulation_profile = call.data["profile"]
 
     async def handle_inject_fault(call: ServiceCall) -> None:
-        coordinator = _get_coordinator(hass, call)
         fault_type = call.data["fault_type"]
         duration = call.data["duration_seconds"]
         fault_state = FAULT_TYPES.get(fault_type, {})
-        coordinator.set_state(**fault_state)
+        coordinators = _get_coordinators(hass, call)
+        for coordinator in coordinators:
+            if applicable := _applicable(coordinator, fault_state):
+                coordinator.set_state(**applicable)
 
         async def _auto_clear() -> None:
             await asyncio.sleep(duration)
-            clear_state = {k: (False if isinstance(v, bool) else v) for k, v in fault_state.items()}
-            # Restore connected=True and battery to reasonable value if those were faulted
-            if "connected" in clear_state:
-                clear_state["connected"] = True
-            if "battery" in fault_state:
-                clear_state["battery"] = coordinator.data.get("battery", 5.0)
-            coordinator.set_state(**clear_state)
+            for coordinator in coordinators:
+                clear_state = {
+                    k: (False if isinstance(v, bool) else v)
+                    for k, v in _applicable(coordinator, fault_state).items()
+                }
+                if not clear_state:
+                    continue
+                # Restore connected=True and battery to a reasonable value
+                if "connected" in clear_state:
+                    clear_state["connected"] = True
+                if "battery" in clear_state:
+                    clear_state["battery"] = coordinator.data.get("battery", 5.0)
+                coordinator.set_state(**clear_state)
 
         hass.async_create_task(_auto_clear())
 

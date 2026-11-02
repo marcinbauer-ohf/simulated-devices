@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DEVICE_TYPE_HUMIDIFIER
-from .coordinator import SimulatedDeviceCoordinator
+from .coordinator import SimulatedDeviceCoordinator, coordinators_for
 from .entity import SimulatedEntity
 
 
@@ -21,10 +21,9 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up simulated humidifier entities."""
-    coordinator: SimulatedDeviceCoordinator = entry.runtime_data
-    if coordinator.device_type != DEVICE_TYPE_HUMIDIFIER:
-        return
-    async_add_entities([SimulatedHumidifierEntity(coordinator)])
+    async_add_entities(
+        SimulatedHumidifierEntity(c) for c in coordinators_for(entry, DEVICE_TYPE_HUMIDIFIER)
+    )
 
 
 class SimulatedHumidifierEntity(SimulatedEntity, HumidifierEntity):

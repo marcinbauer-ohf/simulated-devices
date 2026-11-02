@@ -20,14 +20,23 @@ class SimulatedEntity(CoordinatorEntity[SimulatedDeviceCoordinator]):
         """Initialize the entity."""
         super().__init__(coordinator)
         self._entity_key = entity_key
-        self._attr_name = entity_name
-        self._attr_unique_id = f"{coordinator.config_entry.entry_id}_{entity_key}"
+        # On the composite device every sub-type contributes entities to the
+        # same device, so keys and names must carry the sub-type to stay unique.
+        if coordinator.is_composite:
+            self._attr_name = f"{DEVICE_TYPES[coordinator.device_type]} {entity_name}"
+            unique_key = f"{coordinator.device_type}_{entity_key}"
+        else:
+            self._attr_name = entity_name
+            unique_key = entity_key
+        self._attr_unique_id = f"{coordinator.config_entry.entry_id}_{unique_key}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, coordinator.config_entry.entry_id)},
             name=coordinator.device_name,
             manufacturer="Simulated",
-            model=DEVICE_TYPES[coordinator.device_type],
-            sw_version="1.0",
+            model=DEVICE_TYPES[coordinator.entry_device_type],
+            sw_version=str(coordinator.data.get("firmware_version", "1.0"))
+            if coordinator.data
+            else "1.0",
         )
 
     @property
