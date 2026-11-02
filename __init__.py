@@ -4,12 +4,16 @@ from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.typing import ConfigType
 
+from .child_devices import async_register_devices, supports_child_devices
 from .const import (
     CONF_DEVICE_TYPE,
+    CHILD_DEVICE_TYPES,
     DEVICE_TYPE_EVERYTHING,
+    DEVICE_TYPES,
     DOMAIN,
     EVERYTHING_SUB_TYPES,
     PLATFORMS,
@@ -65,6 +69,17 @@ async def async_setup_entry(
     ]
     for coordinator in coordinators:
         await coordinator.async_config_entry_first_refresh()
+
+    if device_type in CHILD_DEVICE_TYPES:
+        if not supports_child_devices():
+            raise ConfigEntryError(
+                f"{DEVICE_TYPES[device_type]} needs child device support, added in "
+                "Home Assistant 2026.12. Upgrade, or use one of the other "
+                "simulated device types."
+            )
+        # Both the parent and its children must exist before the platforms,
+        # which are set up concurrently, start attaching entities to them.
+        async_register_devices(hass, entry, coordinators[0])
 
     hass.data[DOMAIN][entry.entry_id] = coordinators
     entry.runtime_data = coordinators

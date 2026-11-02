@@ -9,6 +9,7 @@ from homeassistant.components.update import UpdateEntity, UpdateEntityFeature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .const import DEVICE_TYPE_CHILD_TEST_RIG
 from .coordinator import SimulatedDeviceCoordinator
 from .entity import SimulatedEntity
 
@@ -22,7 +23,11 @@ async def async_setup_entry(
     # Device-level, like the dashboard button: one per entry, not per sub-type.
     # ponytail: availability follows sub-device 0 on the composite device;
     # only visible with random_availability on. Track all coordinators if it bites.
-    async_add_entities([SimulatedUpdateEntity(entry.runtime_data[0])])
+    coordinator = entry.runtime_data[0]
+    # The test rig's parent is deliberately entity-less, so it gets no firmware.
+    if coordinator.device_type == DEVICE_TYPE_CHILD_TEST_RIG:
+        return
+    async_add_entities([SimulatedUpdateEntity(coordinator)])
 
 
 class SimulatedUpdateEntity(SimulatedEntity, UpdateEntity):

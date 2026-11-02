@@ -15,6 +15,7 @@ from homeassistant.helpers import selector
 from homeassistant.util import slugify
 
 from .const import (
+    BATCH_DEVICE_TYPES,
     CONF_DEVICE_TYPE,
     CONF_RANDOM_AVAILABILITY,
     CONF_RANDOM_UPDATES,
@@ -27,7 +28,6 @@ from .const import (
     DEFAULT_UPDATE_INTERVAL,
     DEVICE_TYPES,
     DOMAIN,
-    EVERYTHING_SUB_TYPES,
     MAX_UPDATE_INTERVAL,
     MIN_UPDATE_INTERVAL,
     SIMULATION_PROFILES,
@@ -182,7 +182,7 @@ class SimulatedDevicesConfigFlow(ConfigFlow, domain=DOMAIN):
             interval = user_input[CONF_UPDATE_INTERVAL]
             # Real types only — the composite "Everything" device is not part
             # of a batch, it already contains one of each.
-            for device_type in EVERYTHING_SUB_TYPES:
+            for device_type in BATCH_DEVICE_TYPES:
                 display_name = DEVICE_TYPES[device_type]
                 name = f"{prefix} {display_name}".strip() if prefix else display_name
                 self.hass.async_create_task(

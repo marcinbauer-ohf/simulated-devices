@@ -1,15 +1,21 @@
-"""Static wiring checks — run with `python3 test_platform_wiring.py`.
+"""Wiring checks — run with `python3 test_platform_wiring.py`.
 
-These parse the source instead of importing it, so they run without Home
+Mostly these parse the source instead of importing it, so they run without Home
 Assistant installed. They catch the mistakes this integration is actually
 prone to: a platform listed in PLATFORMS with no module behind it, or a device
 type that no coordinator builder knows how to create state for.
+
+demo_outlets() is the exception: it imports the coordinator behind stub
+Home Assistant modules to run the one piece of real arithmetic here, the power
+strip's per-outlet power and energy.
 """
 
 from __future__ import annotations
 
 import ast
 import pathlib
+import sys
+import types
 
 HERE = pathlib.Path(__file__).parent
 
@@ -75,9 +81,24 @@ def _dispatch_targets(tree: ast.Module, func: str) -> set[str]:
     return out
 
 
+def _set_literal_names(tree: ast.Module, variable: str) -> set[str]:
+    """Names inside a module-level set literal, bare or wrapped in frozenset()."""
+    for node in tree.body:
+        if isinstance(node, (ast.Assign, ast.AnnAssign)) and isinstance(
+            target := getattr(node, "target", None) or node.targets[0], ast.Name
+        ):
+            if target.id != variable:
+                continue
+            for inner in ast.walk(node):
+                if isinstance(inner, ast.Set):
+                    return {e.id for e in inner.elts if isinstance(e, ast.Name)}
+    raise AssertionError(f"{variable} not found as a set literal")
+
+
 def demo() -> None:
     const = _tree("const.py")
     coordinator = _tree("coordinator.py")
+    child_devices = _tree("child_devices.py")
     constants = _device_type_constants(const)
 
     declared = _dict_keys(const, "DEVICE_TYPES")
@@ -121,11 +142,102 @@ def demo() -> None:
         for referenced in _dispatch_targets(coordinator, dispatch):
             assert referenced in methods, f"{dispatch} points at missing {referenced}"
 
+    # Every parent/child type needs a child list, and nothing else may have one:
+    # a missing entry would KeyError while registering the devices.
+    child_types = _set_literal_names(const, "CHILD_DEVICE_TYPES")
+    assert child_types <= declared, child_types - declared
+    assert _dict_keys(child_devices, "CHILDREN") == child_types
+
+    # Child devices cannot be children of a child, so the composite leaves them out.
+    composite = simulated - child_types
+
     print(
         f"wiring OK — {len(simulated)} device types, {len(platforms)} platforms, "
-        f"composite expands to {len(simulated)}"
+        f"{len(child_types)} with child devices, composite expands to {len(composite)}"
     )
+
+
+def _stub_homeassistant() -> None:
+    """Enough of Home Assistant to import coordinator.py, and no more."""
+
+    def module(name: str, **attrs) -> types.ModuleType:
+        mod = types.ModuleType(name)
+        mod.__dict__.update(attrs)
+        sys.modules[name] = mod
+        return mod
+
+    class Anything:
+        """Stands in for a class the coordinator only annotates with."""
+
+        def __class_getitem__(cls, item):
+            return cls
+
+        def __init__(self, *args, **kwargs) -> None:
+            self.update_interval = kwargs.get("update_interval")
+            self.data = None
+
+        def async_set_updated_data(self, data) -> None:
+            self.data = data
+
+    class Platform(str):
+        def __getattr__(self, name):  # pragma: no cover - attribute access only
+            return name.lower()
+
+    module("homeassistant")
+    module("homeassistant.config_entries", ConfigEntry=Anything)
+    module("homeassistant.core", HomeAssistant=Anything, callback=lambda f: f)
+    module("homeassistant.const", Platform=Platform())
+    module("homeassistant.exceptions", ConfigEntryError=Exception)
+    module("homeassistant.util")
+    # Only .hour is ever read, and the repo's own datetime.py shadows the
+    # standard library module here.
+    module("homeassistant.util.dt", now=lambda: types.SimpleNamespace(hour=12))
+    module("homeassistant.helpers")
+    module("homeassistant.helpers.update_coordinator", DataUpdateCoordinator=Anything)
+    module("homeassistant.helpers.device_registry", DeviceInfo=Anything)
+
+
+class _StubEntry:
+    entry_id = "test_entry"
+    title = "Test Strip"
+    options: dict = {}
+    data = {"device_type": "power_strip", "random_updates": False}
+
+
+def demo_outlets() -> None:
+    """Outlet power and energy must follow the switch, not the random walk."""
+    _stub_homeassistant()
+    # The integration's own datetime.py / time.py shadow the standard library
+    # when this directory is on sys.path; import it as a package instead.
+    sys.path = [p for p in sys.path if p not in ("", ".", str(HERE))]
+    sys.path.insert(0, str(HERE.parent))
+    sys.modules.setdefault(HERE.name, types.ModuleType(HERE.name))
+    sys.modules[HERE.name].__path__ = [str(HERE)]
+    coordinator_module = __import__(f"{HERE.name}.coordinator", fromlist=["x"])
+
+    coordinator = coordinator_module.SimulatedDeviceCoordinator(None, _StubEntry())
+    state = coordinator._build_initial_state()
+    assert state["outlet_1_is_on"] is False
+    assert state["total_power_w"] == 0.0
+
+    # One hour with outlet 1 on: 40 W nominal -> 0.04 kWh, and the strip total
+    # must follow. Random updates are off, so the draw is exactly nominal.
+    state["outlet_1_is_on"] = True
+    coordinator._settle_outlets(state, 3600.0)
+    assert state["outlet_1_power_w"] == 40.0, state["outlet_1_power_w"]
+    assert state["outlet_1_energy_kwh"] == 0.04, state["outlet_1_energy_kwh"]
+    assert state["total_power_w"] == 40.0, state["total_power_w"]
+
+    # Switching off stops the draw but keeps the meter.
+    state["outlet_1_is_on"] = False
+    coordinator._settle_outlets(state, 3600.0)
+    assert state["outlet_1_power_w"] == 0.0
+    assert state["outlet_1_energy_kwh"] == 0.04
+    assert state["total_power_w"] == 0.0
+
+    print("outlets OK — power follows the switch, energy accumulates")
 
 
 if __name__ == "__main__":
     demo()
+    demo_outlets()

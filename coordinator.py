@@ -12,6 +12,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
+from .child_devices import GANGS, LENSES, OUTLETS, RIG_DIAGNOSTIC, RIG_CHILDREN
 from .const import (
     BATTERY_DRAIN_RATES,
     CONF_DEVICE_TYPE,
@@ -26,8 +27,10 @@ from .const import (
     DEVICE_TYPE_AIR_QUALITY,
     DEVICE_TYPE_ALARM_PANEL,
     DEVICE_TYPE_BUTTON_DEVICE,
+    DEVICE_TYPE_CHILD_TEST_RIG,
     DEVICE_TYPE_DOOR_WINDOW_SENSOR,
     DEVICE_TYPE_DOORBELL,
+    DEVICE_TYPE_DUAL_LENS_CAMERA,
     DEVICE_TYPE_ENERGY_METER,
     DEVICE_TYPE_EV_CHARGER,
     DEVICE_TYPE_EVERYTHING,
@@ -38,6 +41,7 @@ from .const import (
     DEVICE_TYPE_MEDIA_PLAYER,
     DEVICE_TYPE_MOTION_SENSOR,
     DEVICE_TYPE_PHONE_TRACKER,
+    DEVICE_TYPE_POWER_STRIP,
     DEVICE_TYPE_ROBOT_VACUUM,
     DEVICE_TYPE_SECURITY_CAMERA,
     DEVICE_TYPE_SIREN,
@@ -50,6 +54,7 @@ from .const import (
     DEVICE_TYPE_SMOKE_CO_DETECTOR,
     DEVICE_TYPE_SOLAR_PANEL,
     DEVICE_TYPE_THERMOSTAT,
+    DEVICE_TYPE_WALL_SWITCH_2GANG,
     DEVICE_TYPE_WATER_HEATER,
     DEVICE_TYPE_WATER_LEAK,
     DEVICE_TYPE_WEATHER_STATION,
@@ -81,6 +86,10 @@ _MEDIA_TRACKS = [
 ]
 
 
+# What each outlet of the power strip pulls while switched on, in watts.
+_OUTLET_NOMINAL_W = (40.0, 75.0, 120.0, 180.0)
+
+
 class SimulatedDeviceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     """Coordinator managing state for one simulated device."""
 
@@ -98,6 +107,9 @@ class SimulatedDeviceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.simulation_profile: str = self._get_option_raw(
             entry, CONF_SIMULATION_PROFILE, DEFAULT_SIMULATION_PROFILE
         )
+        # Set in async_setup_entry for the parent/child types, before any
+        # entity is built; None for every other type.
+        self.parent_device_id: str | None = None
         self._alarm_trigger_count: int = 0
         self._vacuum_tick: int = 0
 
@@ -205,6 +217,10 @@ class SimulatedDeviceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             DEVICE_TYPE_LAWN_MOWER: self._init_lawn_mower,
             DEVICE_TYPE_PHONE_TRACKER: self._init_phone_tracker,
             DEVICE_TYPE_HOME_HUB: self._init_home_hub,
+            DEVICE_TYPE_POWER_STRIP: self._init_power_strip,
+            DEVICE_TYPE_DUAL_LENS_CAMERA: self._init_dual_lens_camera,
+            DEVICE_TYPE_WALL_SWITCH_2GANG: self._init_wall_switch_2gang,
+            DEVICE_TYPE_CHILD_TEST_RIG: self._init_child_test_rig,
         }
         builder = builders.get(self.device_type)
         if builder:
@@ -430,6 +446,44 @@ class SimulatedDeviceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             ],
         }
 
+    def _init_power_strip(self) -> dict:
+        state: dict[str, Any] = {
+            "wifi_signal_dbm": -55,
+            "total_power_w": 0.0,
+            OUTLETS[3].state_key("overload"): False,
+        }
+        for outlet in OUTLETS:
+            state[outlet.state_key("is_on")] = False
+            state[outlet.state_key("power_w")] = 0.0
+            state[outlet.state_key("energy_kwh")] = 0.0
+        return state
+
+    def _init_dual_lens_camera(self) -> dict:
+        state: dict[str, Any] = {
+            "wifi_signal_dbm": -60,
+            "privacy_mode": False,
+            "frame": 0,
+        }
+        for lens in LENSES:
+            state[lens.state_key("motion")] = False
+        return state
+
+    def _init_wall_switch_2gang(self) -> dict:
+        state: dict[str, Any] = {"wifi_signal_dbm": -58}
+        for gang in GANGS:
+            state[gang.state_key("is_on")] = False
+        return state
+
+    def _init_child_test_rig(self) -> dict:
+        state: dict[str, Any] = {
+            RIG_DIAGNOSTIC.state_key("fault"): False,
+            RIG_DIAGNOSTIC.state_key("setpoint"): 21.0,
+        }
+        for child in RIG_CHILDREN:
+            if child is not RIG_DIAGNOSTIC:
+                state[child.state_key("is_on")] = False
+        return state
+
     # ------------------------------------------------------------------
     # HA coordinator interface
     # ------------------------------------------------------------------
@@ -495,10 +549,19 @@ class SimulatedDeviceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 DEVICE_TYPE_LAWN_MOWER: self._update_lawn_mower,
                 DEVICE_TYPE_PHONE_TRACKER: self._update_phone_tracker,
                 DEVICE_TYPE_HOME_HUB: self._update_home_hub,
+                DEVICE_TYPE_POWER_STRIP: self._update_power_strip,
+                DEVICE_TYPE_DUAL_LENS_CAMERA: self._update_dual_lens_camera,
+                DEVICE_TYPE_WALL_SWITCH_2GANG: self._update_wall_switch_2gang,
+                DEVICE_TYPE_CHILD_TEST_RIG: self._update_child_test_rig,
             }
             updater = updaters.get(self.device_type)
             if updater:
                 updater(new_state, interval_s)
+
+        # Outlet power and energy follow the switches, so they have to settle
+        # on every tick, not only while random updates are on.
+        if self.device_type == DEVICE_TYPE_POWER_STRIP:
+            self._settle_outlets(new_state, interval_s)
 
         return new_state
 
@@ -509,6 +572,10 @@ class SimulatedDeviceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Apply state overrides immediately."""
         new_state = dict(self.data) if self.data else {}
         new_state.update(kwargs)
+        # An outlet that was just switched should report its draw straight
+        # away, not on the next tick. 0s elapsed, so energy does not move.
+        if self.device_type == DEVICE_TYPE_POWER_STRIP:
+            self._settle_outlets(new_state, 0.0)
         self.async_set_updated_data(new_state)
 
     # ------------------------------------------------------------------
@@ -950,6 +1017,68 @@ class SimulatedDeviceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
         if random.random() < 0.01:
             s["remote_on"] = not s["remote_on"]
+
+    # ------------------------------------------------------------------
+    # Parent/child device updaters
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _drift_wifi(s: dict) -> None:
+        s["wifi_signal_dbm"] = max(
+            -90, min(-30, int(s.get("wifi_signal_dbm", -55)) + random.randint(-3, 3))
+        )
+
+    def _settle_outlets(self, s: dict, interval_s: float) -> None:
+        """Recompute per-outlet power/energy and the strip total."""
+        total = 0.0
+        for index, outlet in enumerate(OUTLETS):
+            nominal = _OUTLET_NOMINAL_W[index]
+            if s.get(outlet.state_key("is_on")):
+                power = (
+                    round(nominal * random.uniform(0.9, 1.1), 1)
+                    if self.random_updates
+                    else nominal
+                )
+            else:
+                power = 0.0
+            s[outlet.state_key("power_w")] = power
+            s[outlet.state_key("energy_kwh")] = round(
+                s.get(outlet.state_key("energy_kwh"), 0.0)
+                + power * interval_s / 3_600_000,
+                6,
+            )
+            total += power
+        s["total_power_w"] = round(total, 1)
+
+    def _update_power_strip(self, s: dict, interval_s: float) -> None:
+        self._drift_wifi(s)
+        for outlet in OUTLETS:
+            if random.random() < 0.05:
+                s[outlet.state_key("is_on")] = not s[outlet.state_key("is_on")]
+        # Outlet 4 is the one wired to the overload sensor.
+        s[OUTLETS[3].state_key("overload")] = bool(
+            s[OUTLETS[3].state_key("is_on")] and random.random() < 0.05
+        )
+
+    def _update_dual_lens_camera(self, s: dict, interval_s: float) -> None:
+        self._drift_wifi(s)
+        s["frame"] = int(s.get("frame", 0)) + 1
+        for lens in LENSES:
+            if s.get("privacy_mode"):
+                s[lens.state_key("motion")] = False
+            elif random.random() < self._motion_probability():
+                s[lens.state_key("motion")] = not s[lens.state_key("motion")]
+
+    def _update_wall_switch_2gang(self, s: dict, interval_s: float) -> None:
+        self._drift_wifi(s)
+        for gang in GANGS:
+            if random.random() < self._light_on_probability():
+                s[gang.state_key("is_on")] = not s[gang.state_key("is_on")]
+
+    def _update_child_test_rig(self, s: dict, interval_s: float) -> None:
+        if random.random() < 0.02:
+            key = RIG_DIAGNOSTIC.state_key("fault")
+            s[key] = not s[key]
 
 
 def coordinators_for(
