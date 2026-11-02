@@ -12,6 +12,12 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .child_devices import (
+    LENSES,
+    OUTLETS,
+    RIG_DIAGNOSTIC,
+    ChildSpec,
+)
 from .const import (
     DEVICE_TYPE_ALARM_PANEL,
     DEVICE_TYPE_AIR_QUALITY,
@@ -41,8 +47,12 @@ from .const import (
     DEVICE_TYPE_LAWN_MOWER,
     DEVICE_TYPE_SECURITY_CAMERA,
     DEVICE_TYPE_WATER_HEATER,
+    DEVICE_TYPE_CHILD_TEST_RIG,
+    DEVICE_TYPE_DUAL_LENS_CAMERA,
+    DEVICE_TYPE_POWER_STRIP,
+    DEVICE_TYPE_WALL_SWITCH_2GANG,
 )
-from .coordinator import SimulatedDeviceCoordinator
+from .coordinator import SimulatedDeviceCoordinator, coordinators_for
 from .entity import SimulatedEntity
 
 
@@ -83,6 +93,9 @@ _DEVICES_WITH_CONNECTIVITY = {
     DEVICE_TYPE_WATER_HEATER,
     DEVICE_TYPE_LAWN_MOWER,
     DEVICE_TYPE_HOME_HUB,
+    DEVICE_TYPE_POWER_STRIP,
+    DEVICE_TYPE_DUAL_LENS_CAMERA,
+    DEVICE_TYPE_WALL_SWITCH_2GANG,
 }
 
 _BINARY_SENSORS_BY_DEVICE_TYPE: dict[str, tuple[SimulatedBinarySensorDescription, ...]] = {
@@ -222,6 +235,28 @@ _BINARY_SENSORS_BY_DEVICE_TYPE: dict[str, tuple[SimulatedBinarySensorDescription
 }
 
 
+# Child-device binary sensors. Their key is a suffix of the child's state key.
+_OVERLOAD = SimulatedBinarySensorDescription(
+    key="overload",
+    name="Overload",
+    device_class=BinarySensorDeviceClass.PROBLEM,
+    entity_category=EntityCategory.DIAGNOSTIC,
+)
+
+_MOTION = SimulatedBinarySensorDescription(
+    key="motion",
+    name="Motion",
+    device_class=BinarySensorDeviceClass.MOTION,
+)
+
+_FAULT = SimulatedBinarySensorDescription(
+    key="fault",
+    name="Fault",
+    device_class=BinarySensorDeviceClass.PROBLEM,
+    entity_category=EntityCategory.DIAGNOSTIC,
+)
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry,
@@ -235,6 +270,21 @@ async def async_setup_entry(
             entities.append(SimulatedConnectivityBinarySensor(coordinator))
         for desc in _BINARY_SENSORS_BY_DEVICE_TYPE.get(coordinator.device_type, ()):
             entities.append(SimulatedBinarySensor(coordinator, desc))
+
+    # Only the last outlet is wired to an overload sensor.
+    entities += [
+        SimulatedChildBinarySensor(c, OUTLETS[3], _OVERLOAD)
+        for c in coordinators_for(entry, DEVICE_TYPE_POWER_STRIP)
+    ]
+    entities += [
+        SimulatedChildBinarySensor(c, lens, _MOTION)
+        for c in coordinators_for(entry, DEVICE_TYPE_DUAL_LENS_CAMERA)
+        for lens in LENSES
+    ]
+    entities += [
+        SimulatedChildBinarySensor(c, RIG_DIAGNOSTIC, _FAULT)
+        for c in coordinators_for(entry, DEVICE_TYPE_CHILD_TEST_RIG)
+    ]
 
     async_add_entities(entities)
 
@@ -274,3 +324,22 @@ class SimulatedBinarySensor(SimulatedEntity, BinarySensorEntity):
     def is_on(self) -> bool:
         val = bool(self.coordinator.data.get(self._description.key, False))
         return not val if self._description.inverted else val
+
+
+class SimulatedChildBinarySensor(SimulatedEntity, BinarySensorEntity):
+    """A binary sensor on a child device, keyed as "<child>_<description key>"."""
+
+    def __init__(
+        self,
+        coordinator: SimulatedDeviceCoordinator,
+        child: ChildSpec,
+        description: SimulatedBinarySensorDescription,
+    ) -> None:
+        super().__init__(coordinator, description.key, description.name, child=child)
+        self._attr_device_class = description.device_class
+        self._attr_entity_category = description.entity_category
+        self._key = child.state_key(description.key)
+
+    @property
+    def is_on(self) -> bool:
+        return bool(self.coordinator.data.get(self._key, False))

@@ -1,7 +1,7 @@
 # Simulated Devices — Home Assistant Custom Integration
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
-![Version](https://img.shields.io/badge/version-2.1.1-blue)
+![Version](https://img.shields.io/badge/version-2.2.0-blue)
 ![HA Version](https://img.shields.io/badge/HA-2026.5%2B-green)
 
 Simulate virtual smart home devices in Home Assistant for testing automations, dashboards, and integrations — without needing real hardware.
@@ -10,11 +10,12 @@ Simulate virtual smart home devices in Home Assistant for testing automations, d
 
 ## Features
 
-- **28 device types** across 33 HA entity platforms
+- **33 device types** across 33 HA entity platforms
 - **"Everything" device** — one device carrying an instance of every entity type at once
+- **Parent/child devices** — power strip, dual-lens camera and 2-gang wall switch split across sub-devices (HA 2026.12+)
 - **Realistic simulation** — state changes, battery drain, sensor drift
 - **Simulation profiles** — Random, Home, Away, Night
-- **One-click batch create** — spin up all 28 devices at once
+- **One-click batch create** — spin up all 33 devices at once
 - **Dashboard generator** — auto-builds a Lovelace dashboard from your devices
 - **5 services** — force state, inject faults, trigger events, reset battery, set profile
 - **Fault injection** — instantly trigger smoke, CO, leak, motion, overload, offline with auto-clear
@@ -39,6 +40,7 @@ Simulate virtual smart home devices in Home Assistant for testing automations, d
 | **Water/Outdoor** | Water Heater, Lawn Mower |
 | **Presence** | Phone Tracker (device_tracker with GPS drift) |
 | **Controller** | Home Hub (number, select, text, date, datetime, time, todo, calendar, notify, remote, scenes) |
+| **Parent/child** | Power Strip, Dual-Lens Camera, 2-Gang Wall Switch, Child Device Test Rig |
 | **Composite** | **Everything** — one device with all of the above |
 
 ### The "Everything" device
@@ -52,7 +54,43 @@ independent state (the light's `is_on` is not the siren's `is_on`). Entity names
 are prefixed with the sub-type, e.g. `Smart Light Light`, `Robot Vacuum Battery`.
 
 It is excluded from **Create all device types at once** — that batch creates the
-28 real types as separate devices.
+33 real types as separate devices.
+
+The parent/child types below are left out of the **Everything** device: a child
+device cannot itself be a child, so they cannot be folded into one device. They
+*are* part of the batch.
+
+### Parent/child (sub-)device types
+
+Four types exercise the parent/child device relationship core added in 2026.12.
+The integration registers the parent device first, then gives each child entity a
+`ChildDeviceInfo` pointing at the parent's device registry id. A child uses the
+parent's config entry, has no connections or firmware of its own, inherits the
+parent's area, and cannot be a parent itself.
+
+| Type | Parent entities | Child devices |
+|---|---|---|
+| **Power Strip** | Connected, Wi-Fi signal, Firmware, Total power | Outlet 1–4, each with Switch, Power (W) and Energy (kWh); Outlet 4 also has an Overload sensor |
+| **Dual-Lens Camera** | Connected, Wi-Fi signal, Firmware, Privacy mode | Wide lens, Telephoto lens — each a Camera plus Motion |
+| **2-Gang Wall Switch** | Connected, Wi-Fi signal, Firmware (diagnostics only) | Left, Right — each a Light |
+| **Child Device Test Rig** | *none* | Four edge cases, below |
+
+Outlet power follows the switch, and energy accumulates from it, so the outlets
+react even with **Random state changes** turned off. Privacy mode blanks both
+lenses.
+
+The **Child Device Test Rig** is there to break frontend layouts on purpose:
+
+- **Normal child** — one Switch, for contrast with the rest
+- **Diagnostics only** — a diagnostic Fault sensor and a config Setpoint, so it
+  must *not* appear in the parent's Controls or Sensors cards
+- **Disabled by default** — registered with `disabled_by=INTEGRATION`; enable it
+  from the device page to see it appear
+- *(unnamed child)* — registered with no name at all, to check empty headings
+- The rig's **parent has no entities of its own**, only children
+
+These four types need HA 2026.12 or newer. On an older core their config entries
+fail to set up with a clear error; every other device type keeps working.
 
 ---
 
@@ -83,7 +121,7 @@ Or manually:
 2. Search for **Simulated Devices**
 3. Choose an option:
    - **Add single device** — pick a device type, give it a name
-   - **Create all device types at once** — set a name prefix (e.g. `Sim`) and create all 24 in one step
+   - **Create all device types at once** — set a name prefix (e.g. `Sim`) and create all 33 in one step
    - **Generate dashboard** — build or rebuild the Lovelace dashboard
    - **Remove all devices** — remove everything (with confirmation)
 

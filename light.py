@@ -18,7 +18,8 @@ from homeassistant.components.light import (
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DEVICE_TYPE_SMART_LIGHT
+from .child_devices import GANGS, ChildSpec
+from .const import DEVICE_TYPE_SMART_LIGHT, DEVICE_TYPE_WALL_SWITCH_2GANG
 from .coordinator import SimulatedDeviceCoordinator, coordinators_for
 from .entity import SimulatedEntity
 
@@ -32,7 +33,12 @@ async def async_setup_entry(
 ) -> None:
     """Set up the simulated light for a config entry."""
     async_add_entities(
-        SimulatedLightEntity(c) for c in coordinators_for(entry, DEVICE_TYPE_SMART_LIGHT)
+        [SimulatedLightEntity(c) for c in coordinators_for(entry, DEVICE_TYPE_SMART_LIGHT)]
+        + [
+            SimulatedGangLightEntity(c, gang)
+            for c in coordinators_for(entry, DEVICE_TYPE_WALL_SWITCH_2GANG)
+            for gang in GANGS
+        ]
     )
 
 
@@ -103,3 +109,27 @@ class SimulatedLightEntity(SimulatedEntity, LightEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         self.coordinator.set_state(is_on=False)
+
+
+class SimulatedGangLightEntity(SimulatedEntity, LightEntity):
+    """One gang of a wall switch — a plain on/off light on a child device."""
+
+    _attr_icon = "mdi:light-switch"
+    _attr_color_mode = ColorMode.ONOFF
+    _attr_supported_color_modes = {ColorMode.ONOFF}
+
+    def __init__(
+        self, coordinator: SimulatedDeviceCoordinator, child: ChildSpec
+    ) -> None:
+        super().__init__(coordinator, "light", "Light", child=child)
+        self._key = child.state_key("is_on")
+
+    @property
+    def is_on(self) -> bool:
+        return bool(self.coordinator.data.get(self._key, False))
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        self.coordinator.set_state(**{self._key: True})
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        self.coordinator.set_state(**{self._key: False})

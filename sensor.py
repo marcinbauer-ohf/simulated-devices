@@ -10,6 +10,8 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.const import (
     PERCENTAGE,
+    SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
+    EntityCategory,
     UnitOfElectricCurrent,
     UnitOfElectricPotential,
     UnitOfEnergy,
@@ -18,16 +20,15 @@ from homeassistant.const import (
     UnitOfVolume,
 )
 
-_UNIT_LUX = "lx"
-_UNIT_UGM3 = "µg/m³"
-_UNIT_PPM = "ppm"
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .child_devices import OUTLETS, ChildSpec
 from .const import (
     DEVICE_TYPE_AIR_QUALITY,
     DEVICE_TYPE_BUTTON_DEVICE,
     DEVICE_TYPE_DOOR_WINDOW_SENSOR,
+    DEVICE_TYPE_DUAL_LENS_CAMERA,
     DEVICE_TYPE_DOORBELL,
     DEVICE_TYPE_ENERGY_METER,
     DEVICE_TYPE_EV_CHARGER,
@@ -36,6 +37,7 @@ from .const import (
     DEVICE_TYPE_MOTION_SENSOR,
     DEVICE_TYPE_LAWN_MOWER,
     DEVICE_TYPE_PHONE_TRACKER,
+    DEVICE_TYPE_POWER_STRIP,
     DEVICE_TYPE_ROBOT_VACUUM,
     DEVICE_TYPE_SECURITY_CAMERA,
     DEVICE_TYPE_SIREN,
@@ -48,12 +50,17 @@ from .const import (
     DEVICE_TYPE_SMOKE_CO_DETECTOR,
     DEVICE_TYPE_SOLAR_PANEL,
     DEVICE_TYPE_THERMOSTAT,
+    DEVICE_TYPE_WALL_SWITCH_2GANG,
     DEVICE_TYPE_WATER_HEATER,
     DEVICE_TYPE_WATER_LEAK,
     DEVICE_TYPE_WEATHER_STATION,
 )
 from .coordinator import SimulatedDeviceCoordinator
 from .entity import SimulatedEntity
+
+_UNIT_LUX = "lx"
+_UNIT_UGM3 = "µg/m³"
+_UNIT_PPM = "ppm"
 
 # ---------------------------------------------------------------------------
 # Shared reusable descriptors
@@ -81,6 +88,15 @@ _HUMIDITY_PCT = SensorEntityDescription(
     native_unit_of_measurement=PERCENTAGE,
     device_class=SensorDeviceClass.HUMIDITY,
     state_class=SensorStateClass.MEASUREMENT,
+)
+
+_WIFI_SIGNAL = SensorEntityDescription(
+    key="wifi_signal_dbm",
+    name="Wi-Fi signal",
+    native_unit_of_measurement=SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
+    device_class=SensorDeviceClass.SIGNAL_STRENGTH,
+    state_class=SensorStateClass.MEASUREMENT,
+    entity_category=EntityCategory.DIAGNOSTIC,
 )
 
 # ---------------------------------------------------------------------------
@@ -396,6 +412,35 @@ _LAWN_MOWER_SENSORS: tuple[SensorEntityDescription, ...] = (
     ),
 )
 
+_POWER_STRIP_SENSORS: tuple[SensorEntityDescription, ...] = (
+    _WIFI_SIGNAL,
+    SensorEntityDescription(
+        key="total_power_w",
+        name="Total power",
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+)
+
+# Per-outlet sensors. The key is a suffix — the child device supplies the rest.
+_OUTLET_SENSORS: tuple[SensorEntityDescription, ...] = (
+    SensorEntityDescription(
+        key="power_w",
+        name="Power",
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="energy_kwh",
+        name="Energy",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+    ),
+)
+
 _SENSORS_BY_DEVICE_TYPE: dict[str, tuple[SensorEntityDescription, ...]] = {
     DEVICE_TYPE_SMART_LIGHT: _LIGHT_SENSORS,
     DEVICE_TYPE_SMART_PLUG: _PLUG_SENSORS,
@@ -423,6 +468,9 @@ _SENSORS_BY_DEVICE_TYPE: dict[str, tuple[SensorEntityDescription, ...]] = {
     DEVICE_TYPE_WATER_HEATER: _WATER_HEATER_SENSORS,
     DEVICE_TYPE_LAWN_MOWER: _LAWN_MOWER_SENSORS,
     DEVICE_TYPE_PHONE_TRACKER: _PHONE_TRACKER_SENSORS,
+    DEVICE_TYPE_POWER_STRIP: _POWER_STRIP_SENSORS,
+    DEVICE_TYPE_DUAL_LENS_CAMERA: (_WIFI_SIGNAL,),
+    DEVICE_TYPE_WALL_SWITCH_2GANG: (_WIFI_SIGNAL,),
 }
 
 
@@ -432,11 +480,19 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up simulated sensors."""
-    async_add_entities(
+    entities: list[SensorEntity] = [
         SimulatedValueSensor(coordinator, desc)
         for coordinator in entry.runtime_data
         for desc in _SENSORS_BY_DEVICE_TYPE.get(coordinator.device_type, ())
-    )
+    ]
+    entities += [
+        SimulatedChildValueSensor(coordinator, outlet, desc)
+        for coordinator in entry.runtime_data
+        if coordinator.device_type == DEVICE_TYPE_POWER_STRIP
+        for outlet in OUTLETS
+        for desc in _OUTLET_SENSORS
+    ]
+    async_add_entities(entities)
 
 
 class SimulatedValueSensor(SimulatedEntity, SensorEntity):
@@ -457,3 +513,26 @@ class SimulatedValueSensor(SimulatedEntity, SensorEntity):
     @property
     def native_value(self):
         return self.coordinator.data.get(self.entity_description.key)
+
+
+class SimulatedChildValueSensor(SimulatedEntity, SensorEntity):
+    """A value sensor on a child device, keyed as "<child>_<description key>"."""
+
+    def __init__(
+        self,
+        coordinator: SimulatedDeviceCoordinator,
+        child: ChildSpec,
+        description: SensorEntityDescription,
+    ) -> None:
+        super().__init__(
+            coordinator,
+            description.key,
+            description.name or description.key,
+            child=child,
+        )
+        self.entity_description = description
+        self._key = child.state_key(description.key)
+
+    @property
+    def native_value(self):
+        return self.coordinator.data.get(self._key)

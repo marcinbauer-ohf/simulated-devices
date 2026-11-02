@@ -78,6 +78,12 @@ DEVICE_TYPE_PHONE_TRACKER = "phone_tracker"
 # Controller carrying the generic/config entity platforms
 DEVICE_TYPE_HOME_HUB = "home_hub"
 
+# Parent/child: a device whose entities live on child (sub-)devices
+DEVICE_TYPE_POWER_STRIP = "power_strip"
+DEVICE_TYPE_DUAL_LENS_CAMERA = "dual_lens_camera"
+DEVICE_TYPE_WALL_SWITCH_2GANG = "wall_switch_2gang"
+DEVICE_TYPE_CHILD_TEST_RIG = "child_test_rig"
+
 # Composite: one device carrying an instance of every type above
 DEVICE_TYPE_EVERYTHING = "everything"
 
@@ -123,12 +129,36 @@ DEVICE_TYPES: dict[str, str] = {
     DEVICE_TYPE_PHONE_TRACKER: "Phone Tracker",
     # Controller
     DEVICE_TYPE_HOME_HUB: "Home Hub",
+    # Parent/child
+    DEVICE_TYPE_POWER_STRIP: "Power Strip",
+    DEVICE_TYPE_DUAL_LENS_CAMERA: "Dual-Lens Camera",
+    DEVICE_TYPE_WALL_SWITCH_2GANG: "2-Gang Wall Switch",
+    DEVICE_TYPE_CHILD_TEST_RIG: "Child Device Test Rig",
     # Composite
     DEVICE_TYPE_EVERYTHING: "Everything (all entity types)",
 }
 
-# Sub-types instantiated by the composite "Everything" device — every real type.
+# Types that split their entities across child devices. They need the
+# parent/child device registry support added in HA 2026.12, and a child device
+# cannot itself be a child, so they stay out of the composite device.
+CHILD_DEVICE_TYPES: frozenset[str] = frozenset(
+    {
+        DEVICE_TYPE_POWER_STRIP,
+        DEVICE_TYPE_DUAL_LENS_CAMERA,
+        DEVICE_TYPE_WALL_SWITCH_2GANG,
+        DEVICE_TYPE_CHILD_TEST_RIG,
+    }
+)
+
+# Sub-types instantiated by the composite "Everything" device.
 EVERYTHING_SUB_TYPES: tuple[str, ...] = tuple(
+    t
+    for t in DEVICE_TYPES
+    if t != DEVICE_TYPE_EVERYTHING and t not in CHILD_DEVICE_TYPES
+)
+
+# Types created by "Create all device types at once" — every real type.
+BATCH_DEVICE_TYPES: tuple[str, ...] = tuple(
     t for t in DEVICE_TYPES if t != DEVICE_TYPE_EVERYTHING
 )
 
@@ -203,6 +233,10 @@ BATTERY_DRAIN_RATES: dict[str, float | None] = {
     DEVICE_TYPE_LAWN_MOWER: None,  # handled specially in coordinator
     DEVICE_TYPE_PHONE_TRACKER: 0.4 / 3600,
     DEVICE_TYPE_HOME_HUB: None,
+    DEVICE_TYPE_POWER_STRIP: None,
+    DEVICE_TYPE_DUAL_LENS_CAMERA: None,
+    DEVICE_TYPE_WALL_SWITCH_2GANG: None,
+    DEVICE_TYPE_CHILD_TEST_RIG: None,
     DEVICE_TYPE_EVERYTHING: None,
 }
 
